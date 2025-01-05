@@ -3,7 +3,7 @@ import pandas as pd
 import torch
 
 import matplotlib.pyplot as plt
-from tauccML_GNN import TwoGNN, test_loss 
+from tauccML_GNN import TwoGNN 
 
 from sklearn.metrics import normalized_mutual_info_score as nmi
 from sklearn.metrics import adjusted_rand_score as ari
@@ -33,7 +33,7 @@ def set_seed(seed: int = 42) -> None:
 
 
 # load data
-dataset = 'cstr' #, cstr, tr11, tr41, hitech, k1b, reviews, sports
+dataset = 'cstr' #, cstr, tr11, tr41, hitech, k1b, reviews, sports, classic3
 init = 'extract_centroids' # this is the only initialization considered in the paper UNUSED
 
 input_CSV = pd.read_csv(f'./datasets/{dataset}.txt')
@@ -51,12 +51,14 @@ for row in input_CSV.iterrows():
 # set some parameters
 hidden_size = 128
 embedding_size = 10
-num_epochs= 100
+num_epochs = 40
 input_dimx = table_size_x
 input_dimy = table_size_y
 hidden_dim = hidden_size
 output_dim = embedding_size
 num_layers = 3
+learning_rate = 0.002
+exp_schedule = 0.9
 dtype = torch.float32
 
 print("dimensions",table_size_x,table_size_y)
@@ -64,35 +66,36 @@ print("dimensions",table_size_x,table_size_y)
 # Fix seed
 set_seed()
 
-data = torch.from_numpy(input_table).to(device)
-gnn_model = TwoGNN(input_dimx, input_dimy, hidden_dim, output_dim, num_layers, data.transpose(0,1), device)
+data = torch.from_numpy(input_table).to(dtype).to(device)
+gnn_model = TwoGNN(input_dimx, input_dimy, hidden_dim, output_dim, num_layers, learning_rate, exp_schedule, data, device)
 
-x = data.to(dtype)  
-correlation_coefficient = np.corrcoef(data.cpu())
-adjx =  torch.from_numpy(correlation_coefficient).to(device).to(dtype) 
+x = data
+correlation_coefficient = np.corrcoef(x.cpu())
+adjx =  torch.from_numpy(correlation_coefficient).to(dtype).to(device)
 
-y = data.transpose(0,1).to(dtype)  
+y = data.T
 correlation_coefficient = np.corrcoef(y.cpu())
-adjy =  torch.from_numpy(correlation_coefficient).to(device).to(dtype)
+adjy =  torch.from_numpy(correlation_coefficient).to(dtype).to(device)
 
+print("training start")
 gnn_model.fit(x, adjx, y, adjy, num_epochs, embedding_size)
 
-print(target)
-print("")
+print("target :", target, "\n")
+
 gnn_model.row_labels_ = torch.argmax(gnn_model.row_labels_, dim=1)
-print(gnn_model.row_labels_)
+print("predicted row labels :", gnn_model.row_labels_,"\n")
+
 print(f"nmi: {nmi(target, gnn_model.row_labels_.cpu())}")
 print(f"ari: {ari(target, gnn_model.row_labels_.cpu())}")
 
-#### uncomment the lines below to plot tau functions
-##
-##fig, ax = plt.subplots()
-##ax.plot(model.tau_x)
-##ax.plot(model.tau_y)
-##plt.plot([(model.tau_x[i] + model.tau_y[i])/2 for i in range(len(model.tau_x))])
-##ax.legend(['tau x','tau y','avg tau'])
-##ax.set_xlabel('iterations')
-##ax.set_ylabel('tau')
-##plt.show()
+## uncomment the lines below to plot tau functions
 
-#test_loss(device)
+fig, ax = plt.subplots()
+ax.plot(gnn_model.tau_x)
+ax.plot(gnn_model.tau_y)
+plt.plot([(gnn_model.tau_x[i] + gnn_model.tau_y[i])/2 for i in range(len(gnn_model.tau_x))])
+ax.legend(['tau x','tau y','avg tau'])
+ax.set_xlabel('iterations')
+ax.set_ylabel('tau')
+plt.show()
+

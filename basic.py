@@ -6,6 +6,8 @@ from pathlib import Path
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Using device: {device}")
 
+device= "cpu"
+
 a = 0.5
 b = 0.2
 
@@ -48,7 +50,7 @@ class LinRegModel(nn.Module):
         self.layer = nn.Linear(in_features=1, out_features=1)
         self.loss_func = nn.L1Loss()
         self.optim = torch.optim.Adam(self.parameters(),lr = 0.1 )
-        self.scheduler = torch.optim.lr_scheduler.ExponentialLR(self.optim,0.95)
+        self.scheduler = torch.optim.lr_scheduler.LinearLR(self.optim,start_factor=2,end_factor=0.0001,total_iters=50)
 
     def forward(self, input):
        return self.layer(input)
