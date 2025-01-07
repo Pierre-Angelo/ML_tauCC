@@ -33,8 +33,11 @@ class GNN(nn.Module):
             x = self.conv_layers[i](x,adj)
             embeddings.append(x)
         stacked_embeddings = torch.stack(embeddings, dim=1)  # Stack embeddings along dimension 1
+        #print(x.sum(axis = 0)/x.sum())
         output = self.fc(x)
+        print(output.sum(axis = 0)/output.sum())
         output = nn.functional.softmax(output, dim=1)
+        print(output.sum(axis = 0)/output.sum())
         return output, stacked_embeddings
 
 class TwoGNN(nn.Module):
@@ -67,9 +70,8 @@ class TwoGNN(nn.Module):
         q = torch.sum(r,axis=0)                         # q_j
         
         r_sq = torch.square(r)                          # r^2
-
-
-        if(tauyx):
+        
+        if tauyx:
             mask = (p != 0)                             # protect against 0 division
             num1 = torch.sum(r_sq.T[:,mask] / p[mask]) # first part of the numerator
             q_sqr = torch.sum(torch.square(q))          # q^2
@@ -111,7 +113,7 @@ class TwoGNN(nn.Module):
             loss.backward()
             self.optimizer.step()
 
-            self.scheduler.step()
+            #if epoch <30 : self.scheduler.step()
 
             #if  % 100 == 99:  # Print every 100 mini-batches
             print('%d, loss: %.3f' %(epoch + 1, -loss))
