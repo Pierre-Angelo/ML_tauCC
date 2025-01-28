@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import numpy as np
 import torch.nn.functional as func
 
 dtype = torch.float32
@@ -33,11 +32,8 @@ class GNN(nn.Module):
             x = self.conv_layers[i](x,adj)
             embeddings.append(x)
         stacked_embeddings = torch.stack(embeddings, dim=1)  # Stack embeddings along dimension 1
-        #print(x.sum(axis = 0)/x.sum())
         output = self.fc(x)
-        print(output.sum(axis = 0)/output.sum())
-        output = nn.functional.softmax(output, dim=1)
-        print(output.sum(axis = 0)/output.sum())
+        output =  func.softmax(output, dim=1)
         return output, stacked_embeddings
 
 class TwoGNN(nn.Module):
@@ -68,9 +64,8 @@ class TwoGNN(nn.Module):
         r = r / total                                   # r_{ij}
         p = torch.sum(r,axis=1)                         # p_i
         q = torch.sum(r,axis=0)                         # q_j
-        
         r_sq = torch.square(r)                          # r^2
-        
+
         if tauyx:
             mask = (p != 0)                             # protect against 0 division
             num1 = torch.sum(r_sq.T[:,mask] / p[mask]) # first part of the numerator
@@ -83,15 +78,23 @@ class TwoGNN(nn.Module):
             p_sqr = torch.sum(torch.square(p))
             num = num1 - p_sqr
             denom = 1 - p_sqr
-        #print("loss",num/denom)
         
         return -num / denom #compute tau
 
-    def fit(self, x, adjx, y, adjy, epochs, embedding_size):
+    def fit(self, x, adjx, y, adjy, max_epochs, threshold, patience, embedding_size):
         self.train()  # Set the model to training mode
         self.tau_x = []
         self.tau_y = []
-        for epoch in range(epochs):    
+        min_loss = 0
+        loss = 0
+        epoch = 0
+        last_improvement = 0
+        while (loss - min_loss) <= threshold and epoch < max_epochs and (epoch - last_improvement) < patience:
+            if loss < min_loss :
+                min_loss = loss 
+                last_improvement = epoch
+            
+             
             # Forward pass
             outputx, _ = self.gnnx(x, adjx) # (n,k)
             self.row_labels_ = torch.argmax(outputx, dim=1)
@@ -113,11 +116,13 @@ class TwoGNN(nn.Module):
             loss.backward()
             self.optimizer.step()
 
-            #if epoch <30 : self.scheduler.step()
+            if epoch < 60 : self.scheduler.step()
 
-            #if  % 100 == 99:  # Print every 100 mini-batches
             print('%d, loss: %.3f' %(epoch + 1, -loss))
 
             self.tau_x.append(-loss1.item())
             self.tau_y.append(-loss2.item())
+ 
+
+            epoch += 1
 
