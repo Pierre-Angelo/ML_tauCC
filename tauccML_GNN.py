@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import torch.nn.functional as func
+import torch.nn.functional as F
 
 dtype = torch.float32
 torch.set_default_dtype(dtype)
@@ -27,14 +27,11 @@ class GNN(nn.Module):
         self.fc = nn.Linear(hidden_dim, output_dim)
 
     def forward(self, x, adj):
-        embeddings = []
         for i in range(self.num_layers):
             x = self.conv_layers[i](x,adj)
-            embeddings.append(x)
-        stacked_embeddings = torch.stack(embeddings, dim=1)  # Stack embeddings along dimension 1
         output = self.fc(x)
-        output =  func.softmax(output, dim=1)
-        return output, stacked_embeddings
+        output =  F.softmax(output, dim=1)
+        return output
 
 class TwoGNN(nn.Module):
     def __init__(self, input_dimx, input_dimy, hidden_dim, output_dim, num_layers, lr, exp, data, device):
@@ -68,7 +65,7 @@ class TwoGNN(nn.Module):
 
         if tauyx:
             mask = (p != 0)                             # protect against 0 division
-            num1 = torch.sum(r_sq.T[:,mask] / p[mask]) # first part of the numerator
+            num1 = torch.sum(r_sq.T[:,mask] / p[mask])  # first part of the numerator
             q_sqr = torch.sum(torch.square(q))          # q^2
             num = num1 - q_sqr
             denom = 1 - q_sqr
@@ -96,16 +93,16 @@ class TwoGNN(nn.Module):
             
              
             # Forward pass
-            outputx, _ = self.gnnx(x, adjx) # (n,k)
+            outputx = self.gnnx(x, adjx) # (n,k)
             self.row_labels_ = torch.argmax(outputx, dim=1)
-            self.row_labels_ = func.one_hot(self.row_labels_, embedding_size).to(dtype)
+            self.row_labels_ = F.one_hot(self.row_labels_, embedding_size).to(dtype)
             # compute tau
             loss1 = self.loss(outputx, self.col_labels_.to(self.dev), False)
             
             # Other side
-            outputy, _ = self.gnny(y, adjy)
+            outputy = self.gnny(y, adjy)
             self.col_labels_ = torch.argmax(outputy, dim=1)
-            self.col_labels_ = func.one_hot(self.col_labels_, embedding_size).to(dtype)
+            self.col_labels_ = F.one_hot(self.col_labels_, embedding_size).to(dtype)
             # compute tau
             loss2 = self.loss(self.row_labels_.to(self.dev), outputy, True)
                                 

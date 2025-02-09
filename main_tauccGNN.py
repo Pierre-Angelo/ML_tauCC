@@ -33,7 +33,7 @@ def set_seed(seed = 42) :
 
 
 # load data
-dataset = 'sports' #, cstr, tr11, tr41, hitech, k1b, reviews, sports, classic3
+dataset = 'tr11' #, cstr, tr11, tr41, hitech, k1b, reviews, sports, classic3
 init = 'extract_centroids' # this is the only initialization considered in the paper UNUSED
 
 input_CSV = pd.read_csv(f'./datasets/{dataset}.txt')
@@ -51,15 +51,15 @@ for row in input_CSV.iterrows():
 # set some parameters
 hidden_size = 128
 embedding_size = 10
-num_epochs = 200
+num_epochs = 1000
 input_dimx = table_size_x
 input_dimy = table_size_y
 hidden_dim = hidden_size
 output_dim = embedding_size
 num_layers = 3
-learning_rate = 1e-6
-exp_schedule = 0.9
-threshold = 0.05
+learning_rate = 1e-3
+exp_schedule = 1
+threshold = 1
 patience = 150
 dtype = torch.float32
 
@@ -74,17 +74,17 @@ gnn_model = TwoGNN(input_dimx, input_dimy, hidden_dim, output_dim, num_layers, l
 x = data
 correlation_coefficient = np.corrcoef(x.cpu())
 correlation_coefficient[np.isnan(correlation_coefficient)] = 0
-correlation_coefficient = correlation_coefficient - correlation_coefficient.mean()
+#correlation_coefficient = correlation_coefficient - correlation_coefficient.mean()
 
 adjx =  torch.from_numpy(correlation_coefficient).to(dtype).to(device)
 
 y = data.T
 correlation_coefficient = np.corrcoef(y.cpu())
 correlation_coefficient[np.isnan(correlation_coefficient)] = 0
-correlation_coefficient = correlation_coefficient - correlation_coefficient.mean()
+#correlation_coefficient = correlation_coefficient - correlation_coefficient.mean()
 
 adjy =  torch.from_numpy(correlation_coefficient).to(dtype).to(device)
-
+print(adjx.mean(), adjy.mean())
 
 print("training start") 
 gnn_model.fit(x, adjx, y, adjy, num_epochs, threshold, patience, embedding_size)
