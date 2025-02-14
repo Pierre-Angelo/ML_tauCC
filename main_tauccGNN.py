@@ -19,7 +19,7 @@ else :
 print(f"Device : {dev}")
 device = torch.device(dev)  
 
-def set_seed(seed = 42) :
+def set_seed(seed = 0) :
   np.random.seed(seed)
   random.seed(seed)
   torch.manual_seed(seed)
@@ -33,7 +33,7 @@ def set_seed(seed = 42) :
 
 
 # load data
-dataset = 'tr11' #, cstr, tr11, tr41, hitech, k1b, reviews, sports, classic3
+dataset = 'sports' #, cstr, tr11, tr41, hitech, k1b, reviews, sports, classic3
 init = 'extract_centroids' # this is the only initialization considered in the paper UNUSED
 
 input_CSV = pd.read_csv(f'./datasets/{dataset}.txt')
@@ -49,45 +49,51 @@ for row in input_CSV.iterrows():
 
 
 # set some parameters
-hidden_size = 128
+hidden_size = 256
 embedding_size = 10
-num_epochs = 1000
+num_epochs = 100
 input_dimx = table_size_x
 input_dimy = table_size_y
 hidden_dim = hidden_size
 output_dim = embedding_size
-num_layers = 3
-learning_rate = 1e-3
+num_layers = 2
+learning_rate = 1e-4
 exp_schedule = 1
-threshold = 1
+threshold = 0.05
 patience = 150
+edge_thr = 0.2
 dtype = torch.float32
 
 print("dimensions",table_size_x,table_size_y)
 
 # Fix seed
 set_seed()
-
+print(torch.cuda.memory_allocated(device))
 data = torch.from_numpy(input_table).to(dtype).to(device)
 gnn_model = TwoGNN(input_dimx, input_dimy, hidden_dim, output_dim, num_layers, learning_rate, exp_schedule, data, device)
 
 x = data
 correlation_coefficient = np.corrcoef(x.cpu())
 correlation_coefficient[np.isnan(correlation_coefficient)] = 0
+correlation_coefficient[correlation_coefficient < edge_thr] = 0
 #correlation_coefficient = correlation_coefficient - correlation_coefficient.mean()
 
-adjx =  torch.from_numpy(correlation_coefficient).to(dtype).to(device)
+edge_index_x = torch.from_numpy(correlation_coefficient).nonzero().t().contiguous().to(device)
+print(edge_index_x.shape)
+
 
 y = data.T
 correlation_coefficient = np.corrcoef(y.cpu())
 correlation_coefficient[np.isnan(correlation_coefficient)] = 0
+correlation_coefficient[correlation_coefficient < edge_thr] = 0
 #correlation_coefficient = correlation_coefficient - correlation_coefficient.mean()
 
-adjy =  torch.from_numpy(correlation_coefficient).to(dtype).to(device)
-print(adjx.mean(), adjy.mean())
+edge_index_y = torch.from_numpy(correlation_coefficient).nonzero().t().contiguous().to(device)
+print(edge_index_y.shape)
+print(torch.cuda.memory_allocated(device))
 
 print("training start") 
-gnn_model.fit(x, adjx, y, adjy, num_epochs, threshold, patience, embedding_size)
+gnn_model.fit(x, edge_index_x, y, edge_index_y, num_epochs, threshold, patience, embedding_size)
 
 print("target :", target, "\n")
 
@@ -107,4 +113,3 @@ ax.legend(['tau x','tau y','avg tau'])
 ax.set_xlabel('iterations')
 ax.set_ylabel('tau')
 plt.show()
-

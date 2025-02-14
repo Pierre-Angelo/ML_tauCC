@@ -2,33 +2,25 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
+from torch_geometric.nn.conv import GCNConv
 
 dtype = torch.float32
 torch.set_default_dtype(dtype)
 torch.autograd.set_detect_anomaly(True)
 
-class GraphConvolution(nn.Module):
-    def __init__(self, input_dim, output_dim):
-        super(GraphConvolution, self).__init__()
-        self.linear = nn.Linear(input_dim,   output_dim)
-        
-    def forward(self, x, adj):
-        x = torch.matmul(adj,x)
-        x = func.relu(self.linear(x))
-        return x
 
 class GNN(nn.Module):
     def __init__(self, input_dim, hidden_dim, output_dim, num_layers):
         super(GNN, self).__init__()
         self.num_layers = num_layers
-        self.conv_layers = nn.ModuleList([GraphConvolution(input_dim, hidden_dim)])
+        self.conv_layers = nn.ModuleList([GCNConv(input_dim,hidden_dim)])
         for _ in range(num_layers - 1):
-            self.conv_layers.append(GraphConvolution(hidden_dim, hidden_dim))
+            self.conv_layers.append(GCNConv(hidden_dim, hidden_dim))
         self.fc = nn.Linear(hidden_dim, output_dim)
 
-    def forward(self, x, adj):
+    def forward(self, x, edge_index):
         for i in range(self.num_layers):
-            x = self.conv_layers[i](x,adj)
+            x = self.conv_layers[i](x,edge_index)
         output = self.fc(x)
         output =  F.softmax(output, dim=1)
         return output
@@ -78,7 +70,7 @@ class TwoGNN(nn.Module):
         
         return -num / denom #compute tau
 
-    def fit(self, x, adjx, y, adjy, max_epochs, threshold, patience, embedding_size):
+    def fit(self, x, edge_index_x, y, edge_index_y, max_epochs, threshold, patience, embedding_size,verbose = True):
         self.train()  # Set the model to training mode
         self.tau_x = []
         self.tau_y = []
@@ -93,14 +85,14 @@ class TwoGNN(nn.Module):
             
              
             # Forward pass
-            outputx = self.gnnx(x, adjx) # (n,k)
+            outputx = self.gnnx(x, edge_index_x) # (n,k)
             self.row_labels_ = torch.argmax(outputx, dim=1)
             self.row_labels_ = F.one_hot(self.row_labels_, embedding_size).to(dtype)
             # compute tau
             loss1 = self.loss(outputx, self.col_labels_.to(self.dev), False)
             
             # Other side
-            outputy = self.gnny(y, adjy)
+            outputy = self.gnny(y, edge_index_y)
             self.col_labels_ = torch.argmax(outputy, dim=1)
             self.col_labels_ = F.one_hot(self.col_labels_, embedding_size).to(dtype)
             # compute tau
@@ -115,7 +107,7 @@ class TwoGNN(nn.Module):
 
             if epoch < 60 : self.scheduler.step()
 
-            print('%d, loss: %.3f' %(epoch + 1, -loss))
+            if verbose : print('%d, loss: %.3f' %(epoch + 1, -loss))
 
             self.tau_x.append(-loss1.item())
             self.tau_y.append(-loss2.item())
