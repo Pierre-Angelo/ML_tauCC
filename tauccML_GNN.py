@@ -26,10 +26,10 @@ class GNN(nn.Module):
         return output
 
 class TwoGNN(nn.Module):
-    def __init__(self, input_dimx, input_dimy, hidden_dim, output_dim, num_layers, lr, exp, data, device):
+    def __init__(self, input_dimx, input_dimy, num_components, hidden_dim, output_dim, num_layers, lr, exp, data, device):
         super(TwoGNN, self).__init__()
-        self.gnnx = GNN(input_dimy, hidden_dim, output_dim, num_layers).to(device)
-        self.gnny = GNN(input_dimx, hidden_dim, output_dim, num_layers).to(device)
+        self.gnnx = GNN(num_components, hidden_dim, output_dim, num_layers).to(device)
+        self.gnny = GNN(num_components, hidden_dim, output_dim, num_layers).to(device)
         self.dev = device
         # Partitions (one-hot encoded) and data
         self.data = data.to(dtype).T
@@ -82,8 +82,7 @@ class TwoGNN(nn.Module):
             if loss < min_loss :
                 min_loss = loss 
                 last_improvement = epoch
-            
-             
+                
             # Forward pass
             outputx = self.gnnx(x, edge_index_x) # (n,k)
             self.row_labels_ = torch.argmax(outputx, dim=1)

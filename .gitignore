@@ -5,7 +5,7 @@ original
 rapport
 basic.py
 data
-main_MLtauCC.ipynb
+*.ipynb
 testgcn.py
 
 # Byte-compiled / optimized / DLL files

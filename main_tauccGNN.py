@@ -7,6 +7,7 @@ from tauccML_GNN import TwoGNN
 
 from sklearn.metrics import normalized_mutual_info_score as nmi
 from sklearn.metrics import adjusted_rand_score as ari
+from sklearn.decomposition import PCA
 import random
 import os
 
@@ -33,7 +34,7 @@ def set_seed(seed = 0) :
 
 
 # load data
-dataset = 'sports' #, cstr, tr11, tr41, hitech, k1b, reviews, sports, classic3
+dataset = 'hitech' #, cstr, tr11,classic3, hitech, k1b, reviews, sports,tr41 
 init = 'extract_centroids' # this is the only initialization considered in the paper UNUSED
 
 input_CSV = pd.read_csv(f'./datasets/{dataset}.txt')
@@ -50,6 +51,7 @@ for row in input_CSV.iterrows():
 
 # set some parameters
 hidden_size = 256
+num_components = 10
 embedding_size = 10
 num_epochs = 100
 input_dimx = table_size_x
@@ -57,40 +59,39 @@ input_dimy = table_size_y
 hidden_dim = hidden_size
 output_dim = embedding_size
 num_layers = 2
-learning_rate = 1e-4
+learning_rate = 1e-3
 exp_schedule = 1
-threshold = 0.05
+threshold = 1
 patience = 150
-edge_thr = 0.2
+edge_thr = 0.1
 dtype = torch.float32
 
 print("dimensions",table_size_x,table_size_y)
 
 # Fix seed
 set_seed()
-print(torch.cuda.memory_allocated(device))
+#print("at the start :",torch.cuda.memory_allocated(device))
 data = torch.from_numpy(input_table).to(dtype).to(device)
-gnn_model = TwoGNN(input_dimx, input_dimy, hidden_dim, output_dim, num_layers, learning_rate, exp_schedule, data, device)
+gnn_model = TwoGNN(input_dimx, input_dimy,num_components, hidden_dim, output_dim, num_layers, learning_rate, exp_schedule, data, device)
+pca = PCA(num_components)
 
-x = data
-correlation_coefficient = np.corrcoef(x.cpu())
+x = torch.tensor(pca.fit_transform(input_table)).to(dtype).to(device)
+correlation_coefficient = np.corrcoef(input_table)
 correlation_coefficient[np.isnan(correlation_coefficient)] = 0
 correlation_coefficient[correlation_coefficient < edge_thr] = 0
 #correlation_coefficient = correlation_coefficient - correlation_coefficient.mean()
 
 edge_index_x = torch.from_numpy(correlation_coefficient).nonzero().t().contiguous().to(device)
-print(edge_index_x.shape)
 
 
-y = data.T
-correlation_coefficient = np.corrcoef(y.cpu())
+y = torch.tensor(pca.fit_transform(input_table.T)).to(dtype).to(device)
+correlation_coefficient = np.corrcoef(input_table.T)
 correlation_coefficient[np.isnan(correlation_coefficient)] = 0
 correlation_coefficient[correlation_coefficient < edge_thr] = 0
 #correlation_coefficient = correlation_coefficient - correlation_coefficient.mean()
 
 edge_index_y = torch.from_numpy(correlation_coefficient).nonzero().t().contiguous().to(device)
-print(edge_index_y.shape)
-print(torch.cuda.memory_allocated(device))
+
 
 print("training start") 
 gnn_model.fit(x, edge_index_x, y, edge_index_y, num_epochs, threshold, patience, embedding_size)
