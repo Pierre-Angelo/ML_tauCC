@@ -74,7 +74,6 @@ hidden_dim = hidden_size
 output_dim = embedding_size
 num_layers = 2
 learning_rate = 1e-3
-learning_rate = 1e-3
 exp_schedule = 1
 threshold = 0.1
 patience = 20

@@ -72,8 +72,10 @@ for dataset in datasets:
   for row in input_CSV.iterrows():
     input_table[row[1].doc,row[1].word] = row[1].cluster
 
+
   # set some parameters
-  hidden_size = 256
+  hidden_size = 128
+  num_components = 3
   embedding_size = 10
   num_epochs = 50
   input_dimx = table_size_x
@@ -83,16 +85,26 @@ for dataset in datasets:
   num_layers = 2
   learning_rate = 1e-3
   exp_schedule = 1
-  threshold = 0.2
-  patience = 10
+  threshold = 1
+  patience = 150
+  edge_thr = 0.2
   dtype = torch.float32
-  
-  data = torch.from_numpy(input_table).to(dtype).to(device)
-  x = data 
-  edge_index_x = torch.from_numpy(adj_correlation(input_table)).nonzero().t().contiguous().to(device) 
 
-  y = data.T 
-  edge_index_y = torch.from_numpy(adj_correlation(input_table.T)).nonzero().t().contiguous().to(device)
+  data = torch.from_numpy(input_table).to(dtype).to(device)
+  pca = PCA(num_components)
+
+  x = torch.tensor(pca.fit_transform(input_table)).to(dtype).to(device)
+  correlation_coefficient = np.corrcoef(input_table)
+  correlation_coefficient[np.isnan(correlation_coefficient)] = 0
+  correlation_coefficient[correlation_coefficient < edge_thr] = 0
+  edge_index_x = torch.from_numpy(correlation_coefficient).nonzero().t().contiguous().to(device)
+
+
+  y = torch.tensor(pca.fit_transform(input_table.T)).to(dtype).to(device)
+  correlation_coefficient = np.corrcoef(input_table.T)
+  correlation_coefficient[np.isnan(correlation_coefficient)] = 0
+  correlation_coefficient[correlation_coefficient < edge_thr] = 0
+  edge_index_y = torch.from_numpy(correlation_coefficient).nonzero().t().contiguous().to(device)
 
   durations = []
   NMI_table = []
