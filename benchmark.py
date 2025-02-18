@@ -7,6 +7,8 @@ from tauccML_GNN import TwoGNN
 
 from sklearn.metrics import normalized_mutual_info_score as nmi
 from sklearn.metrics import adjusted_rand_score as ari
+from sklearn.decomposition import PCA
+
 import random
 import os
 from time import perf_counter
@@ -95,11 +97,10 @@ for dataset in datasets:
   durations = []
   NMI_table = []
   ARI_table = []
-
   set_seed()
-
+  print("measuring",dataset,":")
   for i in range(5):
-    gnn_model = TwoGNN(input_dimx, input_dimy, hidden_dim, output_dim, num_layers, learning_rate, exp_schedule, data, device)
+    gnn_model = TwoGNN(input_dimx, input_dimy,num_components, hidden_dim, output_dim, num_layers, learning_rate, exp_schedule, data, device)
 
     start = perf_counter()
     gnn_model.fit(x, edge_index_x, y, edge_index_y, num_epochs, threshold, patience, embedding_size,verbose=False)

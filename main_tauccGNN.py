@@ -7,6 +7,7 @@ from tauccML_GNN import TwoGNN
 
 from sklearn.metrics import normalized_mutual_info_score as nmi
 from sklearn.metrics import adjusted_rand_score as ari
+from sklearn.decomposition import PCA
 import random
 import os
 
@@ -61,8 +62,10 @@ input_table = np.zeros((table_size_x,table_size_y), dtype = int)
 for row in input_CSV.iterrows():
   input_table[row[1].doc,row[1].word] = row[1].cluster
 
-# Parameters
+
+# set some parameters
 hidden_size = 256
+num_components = 10
 embedding_size = 10
 num_epochs = 100
 input_dimx = table_size_x
@@ -70,6 +73,7 @@ input_dimy = table_size_y
 hidden_dim = hidden_size
 output_dim = embedding_size
 num_layers = 2
+learning_rate = 1e-3
 learning_rate = 1e-3
 exp_schedule = 1
 threshold = 0.1
@@ -83,7 +87,8 @@ print("dimensions",table_size_x,table_size_y)
 set_seed()
 
 data = torch.from_numpy(input_table).to(dtype).to(device)
-gnn_model = TwoGNN(input_dimx, input_dimy, hidden_dim, output_dim, num_layers, learning_rate, exp_schedule, data, device)
+gnn_model = TwoGNN(input_dimx, input_dimy,num_components, hidden_dim, output_dim, num_layers, learning_rate, exp_schedule, data, device)
+pca = PCA(num_components)
 
 # Generate feature vectors and adjacency mmatrices
 x = data
