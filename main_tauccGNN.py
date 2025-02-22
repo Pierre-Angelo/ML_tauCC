@@ -46,7 +46,7 @@ def adj_cooccurence(data, edge_thr = 1):
   return adj
 
 # load data
-dataset = 'sports' # cstr, tr11, classic3, hitech, k1b, reviews, sports, tr41
+dataset = 'cstr' # cstr, tr11, classic3, hitech, k1b, reviews, sports, tr41
 init = 'extract_centroids' # this is the only initialization considered in the paper UNUSED
 
 input_CSV = pd.read_csv(f'./datasets/{dataset}.txt')
@@ -97,19 +97,19 @@ gnn_model.fit(x, edge_index_x, y, edge_index_y, num_epochs, threshold, patience,
 
 print("target :", target, "\n")
 
-gnn_model.row_labels_ = torch.argmax(gnn_model.row_labels_, dim=1)
-print("predicted row labels :", gnn_model.row_labels_,"\n")
+gnn_model.best_partion = torch.argmax(gnn_model.best_partion, dim=1)
+print("predicted row labels :", gnn_model.best_partion,"\n")
 
-print(f"nmi: {nmi(target, gnn_model.row_labels_.cpu())}")
-print(f"ari: {ari(target, gnn_model.row_labels_.cpu())}")
+print(f"nmi: {nmi(target, gnn_model.best_partion.cpu())}")
+print(f"ari: {ari(target, gnn_model.best_partion.cpu())}")
 
 ## uncomment the lines below to plot tau functions
 
-fig, ax = plt.subplots()
-ax.plot(gnn_model.tau_x)
-ax.plot(gnn_model.tau_y)
-plt.plot([(gnn_model.tau_x[i] + gnn_model.tau_y[i])/2 for i in range(len(gnn_model.tau_x))])
-ax.legend(['tau x','tau y','avg tau'])
-ax.set_xlabel('iterations')
-ax.set_ylabel('tau')
-plt.show()
+#fig, ax = plt.subplots()
+#ax.plot(gnn_model.tau_x)
+#ax.plot(gnn_model.tau_y)
+#plt.plot([(gnn_model.tau_x[i] + gnn_model.tau_y[i])/2 for i in range(len(gnn_model.tau_x))])
+#ax.legend(['tau x','tau y','avg tau'])
+#ax.set_xlabel('iterations')
+#ax.set_ylabel('tau')
+#plt.show()

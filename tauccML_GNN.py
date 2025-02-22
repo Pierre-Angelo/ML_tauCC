@@ -35,6 +35,7 @@ class TwoGNN(nn.Module):
         self.data = data.to(dtype).T
         self.col_labels_ = torch.full((input_dimy, output_dim), fill_value=0.0)#, requires_grad=False) 
         self.row_labels_ = torch.full((input_dimx, output_dim), fill_value=0.0)#, requires_grad=False)
+        self.best_partion = torch.full((input_dimx, output_dim), fill_value=0.0)#, requires_grad=False)
         for i in range(input_dimx):
             j = torch.randint(0, output_dim, (1,))
             self.row_labels_[i,j] = 1
@@ -78,11 +79,12 @@ class TwoGNN(nn.Module):
         loss = 0
         epoch = 0
         last_improvement = 0
+        
         while (loss - min_loss) <= threshold and epoch < max_epochs and (epoch - last_improvement) < patience:
             if loss < min_loss :
                 min_loss = loss 
                 last_improvement = epoch
-            
+                self.best_partion = self.row_labels_.detach().clone()
              
             # Forward pass
             outputx = self.gnnx(x, edge_index_x) # (n,k)
