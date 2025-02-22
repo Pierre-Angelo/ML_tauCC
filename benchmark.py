@@ -47,7 +47,16 @@ def adj_cooccurence(data, edge_thr = 1):
 
   return adj
 
-datasets = ["k1b"] # cstr, tr11, classic3, hitech, k1b, reviews, sports, tr41
+def format_plot(l):
+  for res in l :
+    print(f"({res[0]},{res[1]:.2f}) +- (0,{res[2]:.2f})")
+  print()
+
+ltime = []
+lnmi = []
+lari = []
+
+datasets = ["cstr","tr11"] # cstr, tr11, classic3, hitech, k1b, reviews, sports, tr41
 
 for dataset in datasets:
   input_CSV = pd.read_csv(f'./datasets/{dataset}.txt')
@@ -104,4 +113,16 @@ for dataset in datasets:
     NMI_table.append(nmi(target, gnn_model.row_labels_.cpu()))
   
   print(f"{dataset} : \n  Duration : mean = {mean(durations):.2f} seconds, stdev = {stdev(durations):.2f} seconds\n  NMI : mean = {mean(NMI_table):.2f}, stdev = {stdev(NMI_table):.2f}\n  ARI : mean = {mean(ARI_table):.2f}, stdev = {stdev(ARI_table):.2f}\n")
-  
+
+  ltime.append((dataset,mean(durations),stdev(durations)))
+  lnmi.append((dataset,mean(NMI_table),stdev(NMI_table)))
+  lari.append((dataset,mean(ARI_table),stdev(ARI_table)))
+
+print("time")
+format_plot(ltime)
+
+print("nmi")
+format_plot(lnmi)
+
+print("ari")
+format_plot(lari)
