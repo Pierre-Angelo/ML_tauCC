@@ -3,7 +3,7 @@ import pandas as pd
 import torch
 
 import matplotlib.pyplot as plt
-from tauccML_GNN import TwoGNN 
+from tauccML_GNN import TwoMLP
 
 from sklearn.metrics import normalized_mutual_info_score as nmi
 from sklearn.metrics import adjusted_rand_score as ari
@@ -31,22 +31,8 @@ def set_seed(seed = 0) :
   os.environ["PYTHONHASHSEED"] = str(seed)
   print(f"Random seed set as {seed}")
 
-def adj_corrrelation(data, edge_thr = 0):
-  adj = np.corrcoef(data)
-  adj[np.isnan(adj)] = 0
-  adj[adj < edge_thr] = 0
-
-  return adj
-
-def adj_cooccurence(data, edge_thr = 1):
-  adj = np.matmul(data,data.T)
-  np.fill_diagonal(adj,0)
-  adj[adj < edge_thr] = 0
-
-  return adj
-
 # load data
-dataset = 'cstr' # cstr, tr11, classic3, hitech, k1b, reviews, sports, tr41
+dataset = 'k1b' # cstr, tr11, classic3, hitech, k1b, reviews, sports, tr41
 init = 'extract_centroids' # this is the only initialization considered in the paper UNUSED
 
 input_CSV = pd.read_csv(f'./datasets/{dataset}.txt')
@@ -62,15 +48,15 @@ for row in input_CSV.iterrows():
 
 
 # set some parameters
-hidden_size = 128
+hidden_size = 512
 embedding_size = 10
-num_epochs = 50
+num_epochs = 100
 input_dimx = table_size_x
 input_dimy = table_size_y
 hidden_dim = hidden_size
 output_dim = embedding_size
-num_layers = 2
-learning_rate = 1e-3
+num_layers = 10
+learning_rate = 1e-4
 exp_schedule = 1
 threshold = 1
 patience = 150
@@ -83,32 +69,28 @@ print("dimensions",table_size_x,table_size_y)
 set_seed()
 
 data = torch.from_numpy(input_table).to(dtype).to(device)
-gnn_model = TwoGNN(input_dimx, input_dimy, hidden_dim, output_dim, num_layers, learning_rate, exp_schedule, data, device)
+model = TwoMLP(input_dimx, input_dimy, hidden_dim, output_dim, num_layers, learning_rate, exp_schedule, data, device)
 
 x = data
-edge_index_x = torch.from_numpy(adj_corrrelation(input_table,edge_thr)).nonzero().t().contiguous().to(device)
-
 y = data.T
-edge_index_y = torch.from_numpy(adj_corrrelation(input_table.T,edge_thr)).nonzero().t().contiguous().to(device)
-
 
 print("training start") 
-gnn_model.fit(x, edge_index_x, y, edge_index_y, num_epochs, threshold, patience, embedding_size)
+model.fit(x, y, num_epochs, threshold, patience, embedding_size)
 
 print("target :", target, "\n")
 
-gnn_model.best_partion = torch.argmax(gnn_model.best_partion, dim=1)
-print("predicted row labels :", gnn_model.best_partion,"\n")
+model.best_partion = torch.argmax(model.best_partion, dim=1)
+print("predicted row labels :", model.best_partion,"\n")
 
-print(f"nmi: {nmi(target, gnn_model.best_partion.cpu())}")
-print(f"ari: {ari(target, gnn_model.best_partion.cpu())}")
+print(f"nmi: {nmi(target, model.best_partion.cpu())}")
+print(f"ari: {ari(target, model.best_partion.cpu())}")
 
 ## uncomment the lines below to plot tau functions
 
 #fig, ax = plt.subplots()
-#ax.plot(gnn_model.tau_x)
-#ax.plot(gnn_model.tau_y)
-#plt.plot([(gnn_model.tau_x[i] + gnn_model.tau_y[i])/2 for i in range(len(gnn_model.tau_x))])
+#ax.plot(model.tau_x)
+#ax.plot(model.tau_y)
+#plt.plot([(model.tau_x[i] + model.tau_y[i])/2 for i in range(len(model.tau_x))])
 #ax.legend(['tau x','tau y','avg tau'])
 #ax.set_xlabel('iterations')
 #ax.set_ylabel('tau')

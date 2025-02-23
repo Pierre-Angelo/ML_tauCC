@@ -2,34 +2,33 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
-from torch_geometric.nn.conv import GCNConv
 
 dtype = torch.float32
 torch.set_default_dtype(dtype)
 torch.autograd.set_detect_anomaly(True)
 
 
-class GNN(nn.Module):
+class MLP(nn.Module):
     def __init__(self, input_dim, hidden_dim, output_dim, num_layers):
-        super(GNN, self).__init__()
+        super(MLP, self).__init__()
         self.num_layers = num_layers
-        self.conv_layers = nn.ModuleList([GCNConv(input_dim,hidden_dim)])
+        self.layers = nn.ModuleList([nn.Linear(input_dim,hidden_dim)])
         for _ in range(num_layers - 1):
-            self.conv_layers.append(GCNConv(hidden_dim, hidden_dim))
-        self.fc = nn.Linear(hidden_dim, output_dim)
+            self.layers.append(nn.Linear(hidden_dim, hidden_dim))
+        self.end = nn.Linear(hidden_dim, output_dim)
 
-    def forward(self, x, edge_index):
+    def forward(self, x):
         for i in range(self.num_layers):
-            x = self.conv_layers[i](x,edge_index)
-        output = self.fc(x)
+            x = F.relu(self.layers[i](x))
+        output = self.end(x)
         output =  F.softmax(output, dim=1)
         return output
 
-class TwoGNN(nn.Module):
+class TwoMLP(nn.Module):
     def __init__(self, input_dimx, input_dimy, hidden_dim, output_dim, num_layers, lr, exp, data, device):
-        super(TwoGNN, self).__init__()
-        self.gnnx = GNN(input_dimy, hidden_dim, output_dim, num_layers).to(device)
-        self.gnny = GNN(input_dimx, hidden_dim, output_dim, num_layers).to(device)
+        super(TwoMLP, self).__init__()
+        self.mlpx = MLP(input_dimy, hidden_dim, output_dim, num_layers).to(device)
+        self.mlpy = MLP(input_dimx, hidden_dim, output_dim, num_layers).to(device)
         self.dev = device
         # Partitions (one-hot encoded) and data
         self.data = data.to(dtype).T
@@ -71,7 +70,7 @@ class TwoGNN(nn.Module):
         
         return -num / denom #compute tau
 
-    def fit(self, x, edge_index_x, y, edge_index_y, max_epochs, threshold, patience, embedding_size,verbose = True):
+    def fit(self, x, y, max_epochs, threshold, patience, embedding_size,verbose = True):
         self.train()  # Set the model to training mode
         self.tau_x = []
         self.tau_y = []
@@ -87,14 +86,14 @@ class TwoGNN(nn.Module):
                 self.best_partion = self.row_labels_.detach().clone()
              
             # Forward pass
-            outputx = self.gnnx(x, edge_index_x) # (n,k)
+            outputx = self.mlpx(x) # (n,k)
             self.row_labels_ = torch.argmax(outputx, dim=1)
             self.row_labels_ = F.one_hot(self.row_labels_, embedding_size).to(dtype)
             # compute tau
             loss1 = self.loss(outputx, self.col_labels_.to(self.dev), False)
             
             # Other side
-            outputy = self.gnny(y, edge_index_y)
+            outputy = self.mlpy(y)
             self.col_labels_ = torch.argmax(outputy, dim=1)
             self.col_labels_ = F.one_hot(self.col_labels_, embedding_size).to(dtype)
             # compute tau
