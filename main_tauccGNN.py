@@ -8,6 +8,7 @@ from tauccML_GNN import TwoGNN
 from sklearn.metrics import normalized_mutual_info_score as nmi
 from sklearn.metrics import adjusted_rand_score as ari
 from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
 import random
 import os
 
@@ -63,9 +64,9 @@ for row in input_CSV.iterrows():
   input_table[row[1].doc,row[1].word] = row[1].cluster
 
 
-# set some parameters
-hidden_size = 256
-num_components = 10
+# Parameters
+hidden_size = 128
+explained_variance = 0.8
 embedding_size = 10
 num_epochs = 100
 input_dimx = table_size_x
@@ -85,16 +86,18 @@ print("dimensions",table_size_x,table_size_y)
 # Fix seed
 set_seed()
 
+# Generate feature vector and adjacency matrix
+pca = PCA(explained_variance)
+scaler = StandardScaler()
+
+x = torch.tensor(pca.fit_transform(scaler.fit_transform(input_table))).to(dtype).to(device)
+edge_index_x = torch.from_numpy(adj_corrrelation(input_table,edge_thr)).nonzero().t().contiguous().to(device)
+
+y = torch.tensor(pca.fit_transform(scaler.fit_transform(input_table.T))).to(dtype).to(device)
+edge_index_y = torch.from_numpy(adj_corrrelation(input_table.T,edge_thr)).nonzero().t().contiguous().to(device)
+
 data = torch.from_numpy(input_table).to(dtype).to(device)
-gnn_model = TwoGNN(input_dimx, input_dimy,num_components, hidden_dim, output_dim, num_layers, learning_rate, exp_schedule, data, device)
-pca = PCA(num_components)
-
-# Generate feature vectors and adjacency mmatrices
-x = data
-edge_index_x = torch.from_numpy(adj_cooccurence(input_table)).nonzero().t().contiguous().to(device)
-
-y = data.T
-edge_index_y = torch.from_numpy(adj_cooccurence(input_table.T)).nonzero().t().contiguous().to(device)
+gnn_model = TwoGNN(input_dimx, input_dimy, x.shape[1], y.shape[1], hidden_dim, output_dim, num_layers, learning_rate, exp_schedule, data, device)
 
 
 print("training start") 

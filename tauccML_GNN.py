@@ -26,10 +26,10 @@ class GNN(nn.Module):
         return output
 
 class TwoGNN(nn.Module):
-    def __init__(self, input_dimx, input_dimy, num_components, hidden_dim, output_dim, num_layers, lr, exp, data, device):
+    def __init__(self, input_dimx, input_dimy, num_compx, num_compy, hidden_dim, output_dim, num_layers, lr, exp, data, device):
         super(TwoGNN, self).__init__()
-        self.gnnx = GNN(num_components, hidden_dim, output_dim, num_layers).to(device)
-        self.gnny = GNN(num_components, hidden_dim, output_dim, num_layers).to(device)
+        self.gnnx = GNN(num_compx, hidden_dim, output_dim, num_layers).to(device)
+        self.gnny = GNN(num_compy, hidden_dim, output_dim, num_layers).to(device)
         self.dev = device
         # Partitions (one-hot encoded) and data
         self.data = data.to(dtype).T
