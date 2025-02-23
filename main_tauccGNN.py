@@ -3,7 +3,7 @@ import pandas as pd
 import torch
 
 import matplotlib.pyplot as plt
-from tauccML_GNN import TwoGNN 
+from tauccML_GNN import TwoGAT
 
 from sklearn.metrics import normalized_mutual_info_score as nmi
 from sklearn.metrics import adjusted_rand_score as ari
@@ -46,7 +46,7 @@ def adj_cooccurence(data, edge_thr = 1):
   return adj
 
 # load data
-dataset = 'cstr' # cstr, tr11, classic3, hitech, k1b, reviews, sports, tr41
+dataset = 'reviews' # cstr, tr11, classic3, hitech, k1b, reviews, sports, tr41
 init = 'extract_centroids' # this is the only initialization considered in the paper UNUSED
 
 input_CSV = pd.read_csv(f'./datasets/{dataset}.txt')
@@ -62,9 +62,9 @@ for row in input_CSV.iterrows():
 
 
 # Parameters
-hidden_size = 128
+hidden_size = 256
 embedding_size = 10
-num_epochs = 50
+num_epochs = 100
 input_dimx = table_size_x
 input_dimy = table_size_y
 hidden_dim = hidden_size
@@ -83,7 +83,7 @@ print("dimensions",table_size_x,table_size_y)
 set_seed()
 
 data = torch.from_numpy(input_table).to(dtype).to(device)
-gnn_model = TwoGNN(input_dimx, input_dimy, hidden_dim, output_dim, num_layers, learning_rate, exp_schedule, data, device)
+gnn_model = TwoGAT(input_dimx, input_dimy, hidden_dim, output_dim, num_layers, learning_rate, exp_schedule, data, device)
 
 # Generate feature vectors and adjacency mmatrices
 x = data
