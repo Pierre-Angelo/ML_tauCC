@@ -8,7 +8,6 @@ dtype = torch.float32
 torch.set_default_dtype(dtype)
 torch.autograd.set_detect_anomaly(True)
 
-
 class GNN(nn.Module):
     def __init__(self, input_dim, hidden_dim, output_dim, num_layers):
         super(GNN, self).__init__()
@@ -45,7 +44,6 @@ class TwoGNN(nn.Module):
         self.optimizer = optim.Adam(self.parameters(), lr)
         self.scheduler = torch.optim.lr_scheduler.ExponentialLR(self.optimizer,exp)
 
-    
     def loss(self, Px, Py, tauyx = False):
         # self.data (m,n), Px (n,k), Py(m,k)
         total = torch.sum(self.data)                    # T
@@ -113,7 +111,6 @@ class TwoGNN(nn.Module):
 
             self.tau_x.append(-loss1.item())
             self.tau_y.append(-loss2.item())
- 
 
             epoch += 1
 

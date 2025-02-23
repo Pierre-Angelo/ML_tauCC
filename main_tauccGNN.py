@@ -61,7 +61,7 @@ for row in input_CSV.iterrows():
   input_table[row[1].doc,row[1].word] = row[1].cluster
 
 
-# set some parameters
+# Parameters
 hidden_size = 128
 embedding_size = 10
 num_epochs = 50
@@ -85,6 +85,7 @@ set_seed()
 data = torch.from_numpy(input_table).to(dtype).to(device)
 gnn_model = TwoGNN(input_dimx, input_dimy, hidden_dim, output_dim, num_layers, learning_rate, exp_schedule, data, device)
 
+# Generate feature vectors and adjacency mmatrices
 x = data
 edge_index_x = torch.from_numpy(adj_corrrelation(input_table,edge_thr)).nonzero().t().contiguous().to(device)
 
