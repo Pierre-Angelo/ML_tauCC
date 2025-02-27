@@ -33,11 +33,11 @@ def set_seed(seed = 0) :
   os.environ["PYTHONHASHSEED"] = str(seed)
   print(f"Random seed set as {seed}")
 
-def adj_corrrelation(data, edge_thr = 0):
+def adj_correlation(data):
   adj = np.corrcoef(data)
   adj[np.isnan(adj)] = 0
-  adj[adj < edge_thr] = 0
-
+  adj[adj < np.percentile(adj,95)] = 0
+  
   return adj
 
 def adj_cooccurence(data, edge_thr = 1):
@@ -56,7 +56,7 @@ ltime = []
 lnmi = []
 lari = []
 
-datasets = ["cstr","tr11"] # cstr, tr11, classic3, hitech, k1b, reviews, sports, tr41
+datasets = ["cstr","tr11","classic3", "hitech", "k1b", "reviews", "sports"] # ["cstr","tr11","classic3", "hitech", "k1b", "reviews", "sports"] tr41
 
 for dataset in datasets:
   input_CSV = pd.read_csv(f'./datasets/{dataset}.txt')
@@ -71,7 +71,7 @@ for dataset in datasets:
     input_table[row[1].doc,row[1].word] = row[1].cluster
 
   # set some parameters
-  hidden_size = 128
+  hidden_size = 256
   embedding_size = 10
   num_epochs = 50
   input_dimx = table_size_x
@@ -80,18 +80,17 @@ for dataset in datasets:
   output_dim = embedding_size
   num_layers = 2
   learning_rate = 1e-3
-  exp_schedule = 0.9
-  threshold = 0.05
-  patience = 150
-  edge_thr = 0.5
+  exp_schedule = 1
+  threshold = 0.2
+  patience = 10
   dtype = torch.float32
   
   data = torch.from_numpy(input_table).to(dtype).to(device)
   x = data 
-  edge_index_x = torch.from_numpy(adj_corrrelation(input_table,edge_thr)).nonzero().t().contiguous().to(device) 
+  edge_index_x = torch.from_numpy(adj_correlation(input_table)).nonzero().t().contiguous().to(device) 
 
   y = data.T 
-  edge_index_y = torch.from_numpy(adj_corrrelation(input_table.T,edge_thr)).nonzero().t().contiguous().to(device)
+  edge_index_y = torch.from_numpy(adj_correlation(input_table.T)).nonzero().t().contiguous().to(device)
 
   durations = []
   NMI_table = []

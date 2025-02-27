@@ -31,22 +31,23 @@ def set_seed(seed = 0) :
   os.environ["PYTHONHASHSEED"] = str(seed)
   print(f"Random seed set as {seed}")
 
-def adj_corrrelation(data, edge_thr = 0):
+def adj_correlation(data,percentile = 90):
   adj = np.corrcoef(data)
   adj[np.isnan(adj)] = 0
-  adj[adj < edge_thr] = 0
+  adj[adj < np.percentile(adj,percentile)] = 0
 
+  
   return adj
 
-def adj_cooccurence(data, edge_thr = 1):
+def adj_cooccurence(data, percentile = 90):
   adj = np.matmul(data,data.T)
   np.fill_diagonal(adj,0)
-  adj[adj < edge_thr] = 0
+  adj[adj < np.percentile(adj,percentile)] = 0
 
   return adj
 
 # load data
-dataset = 'cstr' # cstr, tr11, classic3, hitech, k1b, reviews, sports, tr41
+dataset = 'tr11' # cstr, tr11, classic3, hitech, k1b, reviews, sports, tr41
 init = 'extract_centroids' # this is the only initialization considered in the paper UNUSED
 
 input_CSV = pd.read_csv(f'./datasets/{dataset}.txt')
@@ -60,11 +61,10 @@ input_table = np.zeros((table_size_x,table_size_y), dtype = int)
 for row in input_CSV.iterrows():
   input_table[row[1].doc,row[1].word] = row[1].cluster
 
-
 # Parameters
-hidden_size = 128
+hidden_size = 256
 embedding_size = 10
-num_epochs = 50
+num_epochs = 100
 input_dimx = table_size_x
 input_dimy = table_size_y
 hidden_dim = hidden_size
@@ -72,9 +72,9 @@ output_dim = embedding_size
 num_layers = 2
 learning_rate = 1e-3
 exp_schedule = 1
-threshold = 1
-patience = 150
-edge_thr = 0.5
+threshold = 0.1
+patience = 20
+edge_thr = 0.4
 dtype = torch.float32
 
 print("dimensions",table_size_x,table_size_y)
@@ -87,10 +87,10 @@ gnn_model = TwoGNN(input_dimx, input_dimy, hidden_dim, output_dim, num_layers, l
 
 # Generate feature vectors and adjacency mmatrices
 x = data
-edge_index_x = torch.from_numpy(adj_corrrelation(input_table,edge_thr)).nonzero().t().contiguous().to(device)
+edge_index_x = torch.from_numpy(adj_cooccurence(input_table)).nonzero().t().contiguous().to(device)
 
 y = data.T
-edge_index_y = torch.from_numpy(adj_corrrelation(input_table.T,edge_thr)).nonzero().t().contiguous().to(device)
+edge_index_y = torch.from_numpy(adj_cooccurence(input_table.T)).nonzero().t().contiguous().to(device)
 
 
 print("training start") 
