@@ -48,28 +48,19 @@ def adj_cooccurence(data, edge_thr = 1):
   return adj
 
 # load data
-dataset = 'cstr' # cstr, tr11, classic3, hitech, k1b, reviews, sports, tr41
-init = 'extract_centroids' # this is the only initialization considered in the paper UNUSED
+dataset = 'reviews' # cstr, tr11, classic3, hitech, k1b, reviews, sports, tr41
 
-input_CSV = pd.read_csv(f'./datasets/{dataset}.txt')
 target_CSV = pd.read_csv(f'./datasets/{dataset}_target.txt', header = None)
 target = np.array(target_CSV).T[0]
 
-table_size_x = len(input_CSV.doc.unique())
-table_size_y = len(input_CSV.word.unique())
-input_table = np.zeros((table_size_x,table_size_y), dtype = int)
-
-for row in input_CSV.iterrows():
-  input_table[row[1].doc,row[1].word] = row[1].cluster
-
+input_table = np.load(f'./data/{dataset}.npy')
+input_dimx, input_dimy = input_table.shape
 
 # Parameters
 hidden_size = 128
 explained_variance = 0.8
 embedding_size = 10
 num_epochs = 100
-input_dimx = table_size_x
-input_dimy = table_size_y
 hidden_dim = hidden_size
 output_dim = embedding_size
 num_layers = 2
@@ -80,19 +71,14 @@ patience = 150
 edge_thr = 0.1
 dtype = torch.float32
 
-print("dimensions",table_size_x,table_size_y)
-
 # Fix seed
 set_seed()
 
 # Generate feature vector and adjacency matrix
-pca = PCA(explained_variance)
-scaler = StandardScaler()
-
-x = torch.tensor(pca.fit_transform(scaler.fit_transform(input_table))).to(dtype).to(device)
+x = torch.from_numpy(np.load(f'./data/{dataset}_PCA_x_0.8.npy')).to(dtype).to(device)
 edge_index_x = torch.from_numpy(adj_corrrelation(input_table,edge_thr)).nonzero().t().contiguous().to(device)
 
-y = torch.tensor(pca.fit_transform(scaler.fit_transform(input_table.T))).to(dtype).to(device)
+y = torch.from_numpy(np.load(f'./data/{dataset}_PCA_y_0.8.npy')).to(dtype).to(device)
 edge_index_y = torch.from_numpy(adj_corrrelation(input_table.T,edge_thr)).nonzero().t().contiguous().to(device)
 
 data = torch.from_numpy(input_table).to(dtype).to(device)
@@ -120,3 +106,4 @@ print(f"ari: {ari(target, gnn_model.best_partion.cpu())}")
 #ax.set_xlabel('iterations')
 #ax.set_ylabel('tau')
 #plt.show()
+# load data
