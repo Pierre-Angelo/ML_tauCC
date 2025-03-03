@@ -20,7 +20,7 @@ class GNN(nn.Module):
     def forward(self, x, edge_index):
         for i in range(self.num_layers):
             x = self.conv_layers[i](x,edge_index)
-            x = F.elu(x)
+            x = F.relu(x)
         output = self.fc(x)
         output =  F.softmax(output, dim=1)
         return output

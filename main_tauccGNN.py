@@ -9,8 +9,6 @@ from sklearn.metrics import normalized_mutual_info_score as nmi
 from sklearn.metrics import adjusted_rand_score as ari
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
-from sklearn.decomposition import PCA
-from sklearn.preprocessing import StandardScaler
 import random
 import os
 
@@ -51,7 +49,7 @@ def adj_cooccurence(data, percentile = 90):
   return adj
 
 # load data
-dataset = 'reviews' # cstr, tr11, classic3, hitech, k1b, reviews, sports, tr41
+dataset = 'cstr' # cstr, tr11, classic3, hitech, k1b, reviews, sports, tr41
 
 target_CSV = pd.read_csv(f'./datasets/{dataset}_target.txt', header = None)
 target = np.array(target_CSV).T[0]
@@ -60,36 +58,34 @@ input_table = np.load(f'./data/{dataset}.npy')
 input_dimx, input_dimy = input_table.shape
 
 # Parameters
-hidden_size = 128
+hidden_dim = 128
 explained_variance = 0.8
 embedding_size = 10
 num_epochs = 100
-hidden_dim = hidden_size
-output_dim = embedding_size
 num_layers = 2
 learning_rate = 1e-3
 exp_schedule = 1
 threshold = 0.1
 patience = 20
-edge_thr = 0.4
+edge_percentile = 95 
 dtype = torch.float32
 
 # Fix seed
 set_seed()
 
 # Generate feature vector and adjacency matrix
-x = torch.from_numpy(np.load(f'./data/{dataset}_PCA_x_0.8.npy')).to(dtype).to(device)
-edge_index_x = torch.from_numpy(adj_corrrelation(input_table,edge_thr)).nonzero().t().contiguous().to(device)
+objects_embedding = torch.from_numpy(np.load(f'./data/{dataset}_PCA_x_0.8.npy')).to(dtype).to(device)
+objects_edge_index = torch.from_numpy(adj_correlation(input_table,edge_percentile)).nonzero().t().contiguous().to(device)
 
-y = torch.from_numpy(np.load(f'./data/{dataset}_PCA_y_0.8.npy')).to(dtype).to(device)
-edge_index_y = torch.from_numpy(adj_corrrelation(input_table.T,edge_thr)).nonzero().t().contiguous().to(device)
+features_embedding = torch.from_numpy(np.load(f'./data/{dataset}_PCA_y_0.8.npy')).to(dtype).to(device)
+features_edge_index = torch.from_numpy(adj_correlation(input_table.T,edge_percentile)).nonzero().t().contiguous().to(device)
 
 data = torch.from_numpy(input_table).to(dtype).to(device)
-gnn_model = TwoGNN(input_dimx, input_dimy, x.shape[1], y.shape[1], hidden_dim, output_dim, num_layers, learning_rate, exp_schedule, data, device)
+gnn_model = TwoGNN(input_dimx, input_dimy, objects_embedding.shape[1], features_embedding.shape[1], hidden_dim, embedding_size, num_layers, learning_rate, exp_schedule, data, device)
 
 
 print("training start") 
-gnn_model.fit(x, edge_index_x, y, edge_index_y, num_epochs, threshold, patience, embedding_size)
+gnn_model.fit(objects_embedding, objects_edge_index, features_embedding, features_edge_index, num_epochs, threshold, patience, embedding_size)
 
 print("target :", target, "\n")
 

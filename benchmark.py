@@ -23,7 +23,7 @@ else :
 print(f"Device : {dev}")
 device = torch.device(dev)  
 
-def set_seed(seed = 0) :
+def set_seed(seed = 0,) :
   np.random.seed(seed)
   random.seed(seed)
   torch.manual_seed(seed)
@@ -35,17 +35,18 @@ def set_seed(seed = 0) :
   os.environ["PYTHONHASHSEED"] = str(seed)
   print(f"Random seed set as {seed}")
 
-def adj_correlation(data):
+def adj_correlation(data,percentile = 95):
   adj = np.corrcoef(data)
   adj[np.isnan(adj)] = 0
-  adj[adj < np.percentile(adj,95)] = 0
+  adj[adj < np.percentile(adj,percentile)] = 0
+
   
   return adj
 
-def adj_cooccurence(data, edge_thr = 1):
+def adj_cooccurence(data, percentile = 95):
   adj = np.matmul(data,data.T)
   np.fill_diagonal(adj,0)
-  adj[adj < edge_thr] = 0
+  adj[adj < np.percentile(adj,percentile)] = 0
 
   return adj
 
@@ -61,68 +62,54 @@ lari = []
 datasets = ["cstr","tr11","classic3", "hitech", "k1b", "reviews", "sports"] # ["cstr","tr11","classic3", "hitech", "k1b", "reviews", "sports"] tr41
 
 for dataset in datasets:
-  input_CSV = pd.read_csv(f'./datasets/{dataset}.txt')
   target_CSV = pd.read_csv(f'./datasets/{dataset}_target.txt', header = None)
   target = np.array(target_CSV).T[0]
 
-  table_size_x = len(input_CSV.doc.unique())
-  table_size_y = len(input_CSV.word.unique())
-  input_table = np.zeros((table_size_x,table_size_y), dtype = int)
-
-  for row in input_CSV.iterrows():
-    input_table[row[1].doc,row[1].word] = row[1].cluster
+  input_table = np.load(f'./data/{dataset}.npy')
+  input_dimx, input_dimy = input_table.shape
 
 
-  # set some parameters
-  hidden_size = 128
-  num_components = 3
+  # Parameters
+  hidden_dim = 128
+  explained_variance = 0.8
   embedding_size = 10
-  num_epochs = 50
-  input_dimx = table_size_x
-  input_dimy = table_size_y
-  hidden_dim = hidden_size
-  output_dim = embedding_size
+  num_epochs = 100
   num_layers = 2
   learning_rate = 1e-3
   exp_schedule = 1
-  threshold = 1
-  patience = 150
-  edge_thr = 0.2
+  threshold = 0.1
+  patience = 20
+  edge_percentile = 95 
   dtype = torch.float32
 
+
+  objects_embedding = torch.from_numpy(np.load(f'./data/{dataset}_PCA_x_0.8.npy')).to(dtype).to(device)
+  objects_edge_index = torch.from_numpy(adj_correlation(input_table,edge_percentile)).nonzero().t().contiguous().to(device)
+
+  features_embedding = torch.from_numpy(np.load(f'./data/{dataset}_PCA_y_0.8.npy')).to(dtype).to(device)
+  features_edge_index = torch.from_numpy(adj_correlation(input_table.T,edge_percentile)).nonzero().t().contiguous().to(device)
+
   data = torch.from_numpy(input_table).to(dtype).to(device)
-  pca = PCA(num_components)
 
-  x = torch.tensor(pca.fit_transform(input_table)).to(dtype).to(device)
-  correlation_coefficient = np.corrcoef(input_table)
-  correlation_coefficient[np.isnan(correlation_coefficient)] = 0
-  correlation_coefficient[correlation_coefficient < edge_thr] = 0
-  edge_index_x = torch.from_numpy(correlation_coefficient).nonzero().t().contiguous().to(device)
-
-
-  y = torch.tensor(pca.fit_transform(input_table.T)).to(dtype).to(device)
-  correlation_coefficient = np.corrcoef(input_table.T)
-  correlation_coefficient[np.isnan(correlation_coefficient)] = 0
-  correlation_coefficient[correlation_coefficient < edge_thr] = 0
-  edge_index_y = torch.from_numpy(correlation_coefficient).nonzero().t().contiguous().to(device)
 
   durations = []
   NMI_table = []
   ARI_table = []
   set_seed()
-  print("measuring",dataset,":")
+
+  print("evaluating",dataset,":")
   for i in range(5):
-    gnn_model = TwoGNN(input_dimx, input_dimy,num_components, hidden_dim, output_dim, num_layers, learning_rate, exp_schedule, data, device)
+    gnn_model = TwoGNN(input_dimx, input_dimy, objects_embedding.shape[1], features_embedding.shape[1], hidden_dim, embedding_size, num_layers, learning_rate, exp_schedule, data, device)
 
     start = perf_counter()
-    gnn_model.fit(x, edge_index_x, y, edge_index_y, num_epochs, threshold, patience, embedding_size,verbose=False)
+    gnn_model = TwoGNN(input_dimx, input_dimy, objects_embedding.shape[1], features_embedding.shape[1], hidden_dim, embedding_size, num_layers, learning_rate, exp_schedule, data, device)
     duration = perf_counter() - start
 
-    gnn_model.row_labels_ = torch.argmax(gnn_model.row_labels_, dim=1)
+    gnn_model.best_partion = torch.argmax(gnn_model.best_partion, dim=1)
 
     durations.append(duration)        
-    ARI_table.append(ari(target, gnn_model.row_labels_.cpu()))
-    NMI_table.append(nmi(target, gnn_model.row_labels_.cpu()))
+    ARI_table.append(ari(target, gnn_model.best_partion.cpu()))
+    NMI_table.append(nmi(target, gnn_model.best_partion.cpu()))
   
   print(f"{dataset} : \n  Duration : mean = {mean(durations):.2f} seconds, stdev = {stdev(durations):.2f} seconds\n  NMI : mean = {mean(NMI_table):.2f}, stdev = {stdev(NMI_table):.2f}\n  ARI : mean = {mean(ARI_table):.2f}, stdev = {stdev(ARI_table):.2f}\n")
 
