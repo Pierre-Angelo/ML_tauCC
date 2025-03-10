@@ -1,16 +1,14 @@
 import numpy as np
-import pandas as pd
 import torch
 
-import matplotlib.pyplot as plt
 from tauccML_GNN import TwoGNN 
+from main_tauccGNN import set_seed, adj_correlation, adj_cooccurence
 
 from sklearn.metrics import normalized_mutual_info_score as nmi
 from sklearn.metrics import adjusted_rand_score as ari
-from sklearn.decomposition import PCA
 
-import random
-import os
+import pandas as pd
+
 from time import perf_counter
 from statistics import mean, stdev
 
@@ -23,33 +21,6 @@ else :
 print(f"Device : {dev}")
 device = torch.device(dev)  
 
-def set_seed(seed = 0,) :
-  np.random.seed(seed)
-  random.seed(seed)
-  torch.manual_seed(seed)
-  torch.cuda.manual_seed(seed)
-  # When running on the CuDNN backend, two further options must be set
-  torch.backends.cudnn.deterministic = True
-  torch.backends.cudnn.benchmark = False
-  # Set a fixed value for the hash seed
-  os.environ["PYTHONHASHSEED"] = str(seed)
-  print(f"Random seed set as {seed}")
-
-def adj_correlation(data,percentile = 95):
-  adj = np.corrcoef(data)
-  adj[np.isnan(adj)] = 0
-  adj[adj < np.percentile(adj,percentile)] = 0
-
-  
-  return adj
-
-def adj_cooccurence(data, percentile = 95):
-  adj = np.matmul(data,data.T)
-  np.fill_diagonal(adj,0)
-  adj[adj < np.percentile(adj,percentile)] = 0
-
-  return adj
-
 def format_plot(l):
   for res in l :
     print(f"({res[0]},{res[1]:.2f}) +- (0,{res[2]:.2f})")
@@ -59,35 +30,36 @@ ltime = []
 lnmi = []
 lari = []
 
-datasets = ["cstr","tr11","classic3", "hitech", "k1b", "reviews", "sports"] # ["cstr","tr11","classic3", "hitech", "k1b", "reviews", "sports"] tr41
+# ["cstr","tr11","classic3", "hitech", "k1b", "reviews", "sports"] tr41
+datasets = ["cstr","tr11","classic3", "hitech", "k1b", "reviews", "sports"] 
 
 for dataset in datasets:
   target_CSV = pd.read_csv(f'./datasets/{dataset}_target.txt', header = None)
   target = np.array(target_CSV).T[0]
 
   input_table = np.load(f'./data/{dataset}.npy')
-  input_dimx, input_dimy = input_table.shape
 
+  input_dimx, input_dimy = input_table.shape
 
   # Parameters
   hidden_dim = 128
   explained_variance = 0.8
   embedding_size = 10
-  num_epochs = 100
+  num_epochs = 50
   num_layers = 2
   learning_rate = 1e-3
   exp_schedule = 1
-  threshold = 0.1
-  patience = 20
-  edge_percentile = 95 
+  threshold = 0.05
+  patience = 10
+  edge_percentile = 99 
   dtype = torch.float32
 
 
-  objects_embedding = torch.from_numpy(np.load(f'./data/{dataset}_PCA_x_0.8.npy')).to(dtype).to(device)
-  objects_edge_index = torch.from_numpy(adj_correlation(input_table,edge_percentile)).nonzero().t().contiguous().to(device)
+  objects_embedding = torch.from_numpy(input_table).to(dtype).to(device)
+  objects_edge_index = torch.from_numpy(adj_correlation(input_table)).nonzero().t().contiguous().to(device)
 
-  features_embedding = torch.from_numpy(np.load(f'./data/{dataset}_PCA_y_0.8.npy')).to(dtype).to(device)
-  features_edge_index = torch.from_numpy(adj_correlation(input_table.T,edge_percentile)).nonzero().t().contiguous().to(device)
+  features_embedding = torch.from_numpy(input_table.T).to(dtype).to(device)
+  features_edge_index = torch.from_numpy(adj_correlation(input_table.T)).nonzero().t().contiguous().to(device)
 
   data = torch.from_numpy(input_table).to(dtype).to(device)
 
@@ -102,7 +74,7 @@ for dataset in datasets:
     gnn_model = TwoGNN(input_dimx, input_dimy, objects_embedding.shape[1], features_embedding.shape[1], hidden_dim, embedding_size, num_layers, learning_rate, exp_schedule, data, device)
 
     start = perf_counter()
-    gnn_model = TwoGNN(input_dimx, input_dimy, objects_embedding.shape[1], features_embedding.shape[1], hidden_dim, embedding_size, num_layers, learning_rate, exp_schedule, data, device)
+    gnn_model.fit(objects_embedding, objects_edge_index, features_embedding, features_edge_index, num_epochs, threshold, patience, embedding_size,verbose = False)
     duration = perf_counter() - start
 
     gnn_model.best_partion = torch.argmax(gnn_model.best_partion, dim=1)

@@ -8,7 +8,7 @@ datasets = ["cstr", "tr11", "classic3", "hitech", "k1b", "reviews", "sports"]
 explained_variance = 0.8
 pca = PCA(explained_variance)
 scaler = StandardScaler()
-datasets= ["tr23"]
+
 for dataset in datasets:
     input_CSV = pd.read_csv(f'./datasets/{dataset}.txt')
 
@@ -21,5 +21,5 @@ for dataset in datasets:
 
     np.save(f"data/{dataset}",input_table)
 
-    np.save(f"data/{dataset}_PCA_x_{explained_variance}",pca.fit_transform(scaler.fit_transform(input_table)))
-    np.save(f"data/{dataset}_PCA_y_{explained_variance}",pca.fit_transform(scaler.fit_transform(input_table.T)))
+    #np.save(f"data/{dataset}_PCA_x_{explained_variance}",pca.fit_transform(scaler.fit_transform(input_table)))
+    #np.save(f"data/{dataset}_PCA_y_{explained_variance}",pca.fit_transform(scaler.fit_transform(input_table.T)))
