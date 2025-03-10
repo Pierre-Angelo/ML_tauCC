@@ -1,14 +1,15 @@
 import numpy as np
-import pandas as pd
 import torch
 
-import matplotlib.pyplot as plt
 from tauccML_GNN import TwoGNN 
 
 from sklearn.metrics import normalized_mutual_info_score as nmi
 from sklearn.metrics import adjusted_rand_score as ari
+import pandas as pd
+import numpy as np
+
+import os 
 import random
-import os
 
 if torch.cuda.is_available() :
   print(f"CUDA is supported by this system. \nCUDA version: {torch.version.cuda}")
@@ -19,7 +20,7 @@ else :
 print(f"Device : {dev}")
 device = torch.device(dev)  
 
-def set_seed(seed = 42) :
+def set_seed(seed = 0) :
   np.random.seed(seed)
   random.seed(seed)
   torch.manual_seed(seed)
@@ -31,80 +32,80 @@ def set_seed(seed = 42) :
   os.environ["PYTHONHASHSEED"] = str(seed)
   print(f"Random seed set as {seed}")
 
+def adj_correlation(data,percentile = 90):
+  adj = np.corrcoef(data)
+  adj[np.isnan(adj)] = 0
+  num_nonzero = np.count_nonzero(adj)
+  percentile = percentile if num_nonzero * percentile/100  < 4e6 else int((1 - 4e6/num_nonzero) * 100)
+  adj[adj < np.percentile(adj,percentile)] = 0
+  return adj
 
-# load data
-dataset = 'tr11' #, cstr, tr11, tr41, hitech, k1b, reviews, sports, classic3
-init = 'extract_centroids' # this is the only initialization considered in the paper UNUSED
+def adj_cooccurence(data,device = "cpu", percentile = 90):
+  data = torch.from_numpy(data).to(device).to(torch.float32)
+  adj = torch.matmul(data,data.T).cpu().numpy()
+  np.fill_diagonal(adj,0)
+  num_nonzero = np.count_nonzero(adj)
+  percentile = percentile if num_nonzero * percentile/100  < 4e6 else int((1 - 4e6/num_nonzero) * 100)
+  adj[adj < np.percentile(adj,percentile)] = 0
 
-input_CSV = pd.read_csv(f'./datasets/{dataset}.txt')
-target_CSV = pd.read_csv(f'./datasets/{dataset}_target.txt', header = None)
-target = np.array(target_CSV).T[0]
-
-table_size_x = len(input_CSV.doc.unique())
-table_size_y = len(input_CSV.word.unique())
-input_table = np.zeros((table_size_x,table_size_y), dtype = int)
-
-for row in input_CSV.iterrows():
-  input_table[row[1].doc,row[1].word] = row[1].cluster
+  return adj
 
 
-# set some parameters
-hidden_size = 128
-embedding_size = 10
-num_epochs = 1000
-input_dimx = table_size_x
-input_dimy = table_size_y
-hidden_dim = hidden_size
-output_dim = embedding_size
-num_layers = 3
-learning_rate = 1e-3
-exp_schedule = 1
-threshold = 1
-patience = 150
-dtype = torch.float32
 
-print("dimensions",table_size_x,table_size_y)
+if __name__ == "__main__":
 
-# Fix seed
-set_seed()
+  dataset = 'cstr' # cstr, tr11, classic3, hitech, k1b, reviews, sports, tr41
+  target_CSV = pd.read_csv(f'./datasets/{dataset}_target.txt', header = None)
+  target = np.array(target_CSV).T[0]
 
-data = torch.from_numpy(input_table).to(dtype).to(device)
-gnn_model = TwoGNN(input_dimx, input_dimy, hidden_dim, output_dim, num_layers, learning_rate, exp_schedule, data, device)
+  input_table = np.load(f'./data/{dataset}.npy')
 
-x = data
-correlation_coefficient = np.corrcoef(x.cpu())
-correlation_coefficient[np.isnan(correlation_coefficient)] = 0
-#correlation_coefficient = correlation_coefficient - correlation_coefficient.mean()
+  input_dimx, input_dimy = input_table.shape
+  # Parameters
+  hidden_dim = 128
+  explained_variance = 0.8
+  embedding_size = 10
+  num_epochs = 50
+  num_layers = 2
+  learning_rate = 1e-3
+  exp_schedule = 1
+  threshold = 0.05
+  patience = 10
+  edge_percentile = 99 
+  dtype = torch.float32
+  
+  set_seed()
 
-adjx =  torch.from_numpy(correlation_coefficient).to(dtype).to(device)
+  #Generate feature vector and adjacency matrix (directly conveted into edge index)
+  objects_embedding = torch.from_numpy(np.load(f'./data/{dataset}_PCA_x_{explained_variance}.npy')).to(dtype).to(device)
+  objects_edge_index = torch.from_numpy(adj_cooccurence(input_table,device)).nonzero().t().contiguous().to(device)
 
-y = data.T
-correlation_coefficient = np.corrcoef(y.cpu())
-correlation_coefficient[np.isnan(correlation_coefficient)] = 0
-#correlation_coefficient = correlation_coefficient - correlation_coefficient.mean()
+  features_embedding = torch.from_numpy(np.load(f'./data/{dataset}_PCA_y_{explained_variance}.npy')).to(dtype).to(device)
+  features_edge_index = torch.from_numpy(adj_cooccurence(input_table,device)).nonzero().t().contiguous().to(device)
 
-adjy =  torch.from_numpy(correlation_coefficient).to(dtype).to(device)
-print(adjx.mean(), adjy.mean())
+  data = torch.from_numpy(input_table).to(dtype).to(device)
+  gnn_model = TwoGNN(input_dimx, input_dimy, objects_embedding.shape[1], features_embedding.shape[1], hidden_dim, embedding_size, num_layers, learning_rate, exp_schedule, data, device)
 
-print("training start") 
-gnn_model.fit(x, adjx, y, adjy, num_epochs, threshold, patience, embedding_size)
 
-print("target :", target, "\n")
+  print("training start") 
+  gnn_model.fit(objects_embedding, objects_edge_index, features_embedding, features_edge_index, num_epochs, threshold, patience, embedding_size)
 
-gnn_model.row_labels_ = torch.argmax(gnn_model.row_labels_, dim=1)
-print("predicted row labels :", gnn_model.row_labels_,"\n")
+  print("target :", target, "\n")
 
-print(f"nmi: {nmi(target, gnn_model.row_labels_.cpu())}")
-print(f"ari: {ari(target, gnn_model.row_labels_.cpu())}")
+  gnn_model.best_partion = torch.argmax(gnn_model.best_partion, dim=1)
+  print("predicted row labels :", gnn_model.best_partion,"\n")
 
-## uncomment the lines below to plot tau functions
+  print(f"nmi: {nmi(target, gnn_model.best_partion.cpu())}")
+  print(f"ari: {ari(target, gnn_model.best_partion.cpu())}")
 
-fig, ax = plt.subplots()
-ax.plot(gnn_model.tau_x)
-ax.plot(gnn_model.tau_y)
-plt.plot([(gnn_model.tau_x[i] + gnn_model.tau_y[i])/2 for i in range(len(gnn_model.tau_x))])
-ax.legend(['tau x','tau y','avg tau'])
-ax.set_xlabel('iterations')
-ax.set_ylabel('tau')
-plt.show()
+  ## uncomment the lines below to plot tau functions
+  #import matplotlib.pyplot as plt
+  #fig, ax = plt.subplots()
+  #ax.plot(gnn_model.tau_x)
+  #ax.plot(gnn_model.tau_y)
+  #plt.plot([(gnn_model.tau_x[i] + gnn_model.tau_y[i])/2 for i in range(len(gnn_model.tau_x))])
+  #ax.legend(['tau x','tau y','avg tau'])
+  #ax.set_xlabel('iterations')
+  #ax.set_ylabel('tau')
+  #plt.show()
 
