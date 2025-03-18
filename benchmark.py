@@ -7,6 +7,7 @@ from main_tauccGNN import set_seed, adj_correlation, adj_cooccurence
 from sklearn.metrics import normalized_mutual_info_score as nmi
 from sklearn.metrics import adjusted_rand_score as ari
 
+
 import pandas as pd
 
 from time import perf_counter
@@ -31,7 +32,7 @@ lnmi = []
 lari = []
 
 # ["cstr","tr11","classic3", "hitech", "k1b", "reviews", "sports"] tr41
-datasets = ["cstr","tr11","classic3", "hitech", "k1b", "reviews", "sports"] 
+datasets = ["cstr","tr11","classic3", "hitech", "k1b", "reviews", "sports"]
 
 for dataset in datasets:
   target_CSV = pd.read_csv(f'./datasets/{dataset}_target.txt', header = None)
@@ -43,13 +44,13 @@ for dataset in datasets:
 
   # Parameters
   hidden_dim = 128
-  explained_variance = 0.8
+  explained_variance = 0.5
   embedding_size = 10
-  num_epochs = 50
+  num_epochs = 100
   num_layers = 2
   learning_rate = 1e-3
   exp_schedule = 1
-  threshold = 0.05
+  threshold = 0.1
   patience = 10
   edge_percentile = 99 
   dtype = torch.float32
@@ -69,7 +70,6 @@ for dataset in datasets:
   ARI_table = []
   set_seed()
 
-  print("evaluating",dataset,":")
   for i in range(5):
     gnn_model = TwoGNN(input_dimx, input_dimy, objects_embedding.shape[1], features_embedding.shape[1], hidden_dim, embedding_size, num_layers, learning_rate, exp_schedule, data, device)
 

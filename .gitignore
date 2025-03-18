@@ -8,6 +8,8 @@ data
 *.ipynb
 testgcn.py
 results.txt
+Reunions.md
+other
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

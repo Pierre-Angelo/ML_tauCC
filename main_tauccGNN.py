@@ -11,15 +11,6 @@ import numpy as np
 import os 
 import random
 
-if torch.cuda.is_available() :
-  print(f"CUDA is supported by this system. \nCUDA version: {torch.version.cuda}")
-  dev = "cuda:0"
-else :
-  dev = "cpu"
-
-print(f"Device : {dev}")
-device = torch.device(dev)  
-
 def set_seed(seed = 0) :
   np.random.seed(seed)
   random.seed(seed)
@@ -30,7 +21,7 @@ def set_seed(seed = 0) :
   torch.backends.cudnn.benchmark = False
   # Set a fixed value for the hash seed
   os.environ["PYTHONHASHSEED"] = str(seed)
-  print(f"Random seed set as {seed}")
+  #print(f"Random seed set as {seed}")
 
 def adj_correlation(data,percentile = 90):
   adj = np.corrcoef(data)
@@ -50,9 +41,16 @@ def adj_cooccurence(data,device = "cpu", percentile = 90):
 
   return adj
 
-
-
 if __name__ == "__main__":
+
+  if torch.cuda.is_available() :
+    print(f"CUDA is supported by this system. \nCUDA version: {torch.version.cuda}")
+    dev = "cuda:0"
+  else :
+    dev = "cpu"
+
+  print(f"Device : {dev}")
+  device = torch.device(dev)  
 
   dataset = 'cstr' # cstr, tr11, classic3, hitech, k1b, reviews, sports, tr41
   target_CSV = pd.read_csv(f'./datasets/{dataset}_target.txt', header = None)
@@ -62,15 +60,15 @@ if __name__ == "__main__":
 
   input_dimx, input_dimy = input_table.shape
   # Parameters
-  hidden_dim = 128
+  hidden_dim = 256
   explained_variance = 0.8
   embedding_size = 10
-  num_epochs = 50
+  num_epochs = 100
   num_layers = 2
   learning_rate = 1e-3
-  exp_schedule = 1
-  threshold = 0.05
-  patience = 10
+  exp_schedule = 0.05
+  threshold = 100
+  patience = 50
   edge_percentile = 99 
   dtype = torch.float32
   
@@ -78,10 +76,10 @@ if __name__ == "__main__":
 
   #Generate feature vector and adjacency matrix (directly conveted into edge index)
   objects_embedding = torch.from_numpy(np.load(f'./data/{dataset}_PCA_x_{explained_variance}.npy')).to(dtype).to(device)
-  objects_edge_index = torch.from_numpy(adj_cooccurence(input_table,device)).nonzero().t().contiguous().to(device)
+  objects_edge_index = torch.from_numpy(adj_correlation(input_table)).nonzero().t().contiguous().to(device)
 
   features_embedding = torch.from_numpy(np.load(f'./data/{dataset}_PCA_y_{explained_variance}.npy')).to(dtype).to(device)
-  features_edge_index = torch.from_numpy(adj_cooccurence(input_table,device)).nonzero().t().contiguous().to(device)
+  features_edge_index = torch.from_numpy(adj_correlation(input_table.T)).nonzero().t().contiguous().to(device)
 
   data = torch.from_numpy(input_table).to(dtype).to(device)
   gnn_model = TwoGNN(input_dimx, input_dimy, objects_embedding.shape[1], features_embedding.shape[1], hidden_dim, embedding_size, num_layers, learning_rate, exp_schedule, data, device)

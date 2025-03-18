@@ -68,7 +68,7 @@ class TwoGNN(nn.Module):
             num = num1 - p_sqr
             denom = 1 - p_sqr
         
-        return -num / denom #compute tau
+        return -num / (denom+ 1e-10) #compute tau
 
     def fit(self, x, edge_index_x, y, edge_index_y, max_epochs, threshold, patience, embedding_size,verbose = True):
         self.train()  # Set the model to training mode
@@ -104,7 +104,10 @@ class TwoGNN(nn.Module):
             self.optimizer.zero_grad()
             
             loss.backward()
-            self.optimizer.step()
+            """ for p in self.gnnx.parameters():
+                if p.grad.isnan():
+                    p.grad = 0 """
+            self.optimizer.step() 
 
             if epoch < 20 : self.scheduler.step()
 
