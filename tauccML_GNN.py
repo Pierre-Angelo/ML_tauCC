@@ -17,9 +17,9 @@ class GNN(nn.Module):
             self.conv_layers.append(GCNConv(hidden_dim, hidden_dim))
         self.fc = nn.Linear(hidden_dim, output_dim)
 
-    def forward(self, x, edge_index):
+    def forward(self, x, adj):
         for i in range(self.num_layers):
-            x = self.conv_layers[i](x,edge_index)
+            x = self.conv_layers[i](x,adj)
             x = F.elu(x)
         output = self.fc(x)
         output =  F.softmax(output, dim=1)
@@ -70,7 +70,7 @@ class TwoGNN(nn.Module):
         
         return -num / (denom+ 1e-10) #compute tau
 
-    def fit(self, x, edge_index_x, y, edge_index_y, max_epochs, threshold, patience, embedding_size,verbose = True):
+    def fit(self, x,adj_x, y, adj_y, max_epochs, threshold, patience, embedding_size,verbose = True):
         self.train()  # Set the model to training mode
         self.tau_x = []
         self.tau_y = []
@@ -86,14 +86,14 @@ class TwoGNN(nn.Module):
                 self.best_partion = self.row_labels_.detach().clone()
              
             # Forward pass
-            outputx = self.gnnx(x, edge_index_x) # (n,k)
+            outputx = self.gnnx(x, adj_x) # (n,k)
             self.row_labels_ = torch.argmax(outputx, dim=1)
             self.row_labels_ = F.one_hot(self.row_labels_, embedding_size).to(dtype)
             # compute tau
             loss1 = self.loss(outputx, self.col_labels_.to(self.dev), False)
             
             # Other side
-            outputy = self.gnny(y, edge_index_y)
+            outputy = self.gnny(y, adj_y)
             self.col_labels_ = torch.argmax(outputy, dim=1)
             self.col_labels_ = F.one_hot(self.col_labels_, embedding_size).to(dtype)
             # compute tau
