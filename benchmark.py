@@ -27,13 +27,17 @@ def format_plot(l):
     print(f"({res[0]},{res[1]:.2f}) +- (0,{res[2]:.2f})")
   print()
 
+def format_table(nmi,ari,time):
+  for i in range(len(nmi)) :
+    print(f"{nmi[i][0]} & {nmi[i][1]:.2f} $\pm$ {nmi[i][2]:.2f} & {ari[i][1]:.2f} $\pm$ {ari[i][2]:.2f} & {time[i][1]:.2f} $\pm$ {time[i][2]:.2f} \\\\ \n \hline")
+  print()
+
 ltime = []
 lnmi = []
 lari = []
 
-# ["cstr","tr11","classic3", "hitech", "k1b", "reviews", "sports"] tr41
-datasets = ["cstr","tr11","classic3", "hitech", "k1b", "reviews", "sports"]
-
+# ["cstr", "tr23", "tr11", "tr45", "tr41", "classic3", "hitech", "k1b", "reviews", "sports"]
+datasets = ["cstr", "tr23", "tr11", "tr45", "tr41", "classic3", "hitech", "k1b", "reviews", "sports"]
 for dataset in datasets:
   target_CSV = pd.read_csv(f'./datasets/{dataset}_target.txt', header = None)
   target = np.array(target_CSV).T[0]
@@ -43,24 +47,24 @@ for dataset in datasets:
   input_dimx, input_dimy = input_table.shape
 
   # Parameters
-  hidden_dim = 128
+  hidden_dim = 1024
   explained_variance = 0.5
   embedding_size = 10
   num_epochs = 100
-  num_layers = 2
-  learning_rate = 1e-3
+  num_layers = 3
+  learning_rate = 1e-4
   exp_schedule = 1
-  threshold = 0.1
-  patience = 10
-  edge_percentile = 99 
+  threshold = 0.2
+  patience = 20
+  edge_percentile = 98 
   dtype = torch.float32
 
 
-  objects_embedding = torch.from_numpy(input_table).to(dtype).to(device)
-  objects_edge_index = torch.from_numpy(adj_correlation(input_table)).nonzero().t().contiguous().to(device)
+  objects_embedding = torch.from_numpy(np.load(f'./data/{dataset}_PCA_x_{explained_variance}.npy')).to(dtype).to(device)
+  objects_adj_matrix = torch.from_numpy(adj_correlation(input_table,edge_percentile)).to_sparse_csr().to(dtype).to(device)
 
-  features_embedding = torch.from_numpy(input_table.T).to(dtype).to(device)
-  features_edge_index = torch.from_numpy(adj_correlation(input_table.T)).nonzero().t().contiguous().to(device)
+  features_embedding = torch.from_numpy(np.load(f'./data/{dataset}_PCA_y_{explained_variance}.npy')).to(dtype).to(device)
+  features_adj_matrix = torch.from_numpy(adj_correlation(input_table.T,edge_percentile)).to_sparse_csr().to(dtype).to(device)
 
   data = torch.from_numpy(input_table).to(dtype).to(device)
 
@@ -74,7 +78,7 @@ for dataset in datasets:
     gnn_model = TwoGNN(input_dimx, input_dimy, objects_embedding.shape[1], features_embedding.shape[1], hidden_dim, embedding_size, num_layers, learning_rate, exp_schedule, data, device)
 
     start = perf_counter()
-    gnn_model.fit(objects_embedding, objects_edge_index, features_embedding, features_edge_index, num_epochs, threshold, patience, embedding_size,verbose = False)
+    gnn_model.fit(objects_embedding, objects_adj_matrix, features_embedding, features_adj_matrix, num_epochs, threshold, patience, embedding_size,verbose = False)
     duration = perf_counter() - start
 
     gnn_model.best_partion = torch.argmax(gnn_model.best_partion, dim=1)
@@ -97,3 +101,5 @@ format_plot(lnmi)
 
 print("ari")
 format_plot(lari)
+
+format_table(lnmi,lari,ltime)

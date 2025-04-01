@@ -70,10 +70,8 @@ class TwoGNN(nn.Module):
         
         return -num / (denom+ 1e-10) #compute tau
 
-    def fit(self, x,adj_x, y, adj_y, max_epochs, threshold, patience, embedding_size,verbose = True):
+    def fit(self,objects_embedding, objects_adj_matrix, features_embedding, features_adj_matrix, max_epochs, threshold, patience, embedding_size,verbose = True):
         self.train()  # Set the model to training mode
-        self.tau_x = []
-        self.tau_y = []
         min_loss = 0
         loss = 0
         epoch = 0
@@ -86,14 +84,14 @@ class TwoGNN(nn.Module):
                 self.best_partion = self.row_labels_.detach().clone()
              
             # Forward pass
-            outputx = self.gnnx(x, adj_x) # (n,k)
+            outputx = self.gnnx(objects_embedding, objects_adj_matrix) # (n,k)
             self.row_labels_ = torch.argmax(outputx, dim=1)
             self.row_labels_ = F.one_hot(self.row_labels_, embedding_size).to(dtype)
             # compute tau
             loss1 = self.loss(outputx, self.col_labels_.to(self.dev), False)
             
             # Other side
-            outputy = self.gnny(y, adj_y)
+            outputy = self.gnny(features_embedding, features_adj_matrix)
             self.col_labels_ = torch.argmax(outputy, dim=1)
             self.col_labels_ = F.one_hot(self.col_labels_, embedding_size).to(dtype)
             # compute tau
@@ -109,12 +107,9 @@ class TwoGNN(nn.Module):
                     p.grad = 0 """
             self.optimizer.step() 
 
-            if epoch < 20 : self.scheduler.step()
+            #if epoch < 20 : self.scheduler.step()
 
             if verbose : print('%d, loss: %.3f' %(epoch + 1, -loss))
-
-            self.tau_x.append(-loss1.item())
-            self.tau_y.append(-loss2.item())
 
             epoch += 1
 
