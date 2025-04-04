@@ -10,6 +10,10 @@ testgcn.py
 results.txt
 Reunions.md
 other
+figures 
+metalearning.py
+grid_search _results
+test_decom.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

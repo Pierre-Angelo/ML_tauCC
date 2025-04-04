@@ -48,7 +48,7 @@ if __name__ == "__main__":
   print(f"Device : {dev}")
   device = torch.device(dev)  
 
-  dataset = 'classic3' # cstr, tr23, tr11, tr45, tr41, classic3, hitech, k1b, reviews, sports
+  dataset = 'tr11' # cstr, tr23, tr11, tr45, tr41, classic3, hitech, k1b, reviews, sports
   target_CSV = pd.read_csv(f'./datasets/{dataset}_target.txt', header = None)
   target = np.array(target_CSV).T[0]
 
@@ -56,29 +56,36 @@ if __name__ == "__main__":
 
   input_dimx, input_dimy = input_table.shape
   # Parameters
-  hidden_dim = 1024
-  explained_variance = 0.5
+  hidden_dim = 64
+  explained_variance = 1
   embedding_size = 10
   num_epochs = 100
-  num_layers = 3
-  learning_rate = 1e-4
+  num_layers = 2
+  learning_rate = 1e-3
   exp_schedule = 1
   threshold = 0.2
   patience = 20
   edge_percentile = 98 
+  dropout = 0
+  w_decay = 1e-2
   dtype = torch.float32
  
   set_seed()
 
   #Generate feature vector and adjacency matrix (directly conveted into edge index)
-  objects_embedding = torch.from_numpy(np.load(f'./data/{dataset}_PCA_x_{explained_variance}.npy')).to(dtype).to(device)
-  objects_adj_matrix = torch.from_numpy(adj_correlation(input_table,edge_percentile)).to_sparse_csr().to(dtype).to(device)
 
-  features_embedding = torch.from_numpy(np.load(f'./data/{dataset}_PCA_y_{explained_variance}.npy')).to(dtype).to(device)
+  if explained_variance == 1 :
+    objects_embedding = torch.from_numpy(input_table).to(dtype).to(device)
+    features_embedding = torch.from_numpy(input_table.T).to(dtype).to(device)
+  else :
+    objects_embedding = torch.from_numpy(np.load(f'./data/{dataset}_PCA_x_{explained_variance}.npy')).to(dtype).to(device)
+    features_embedding = torch.from_numpy(np.load(f'./data/{dataset}_PCA_y_{explained_variance}.npy')).to(dtype).to(device)
+
+  objects_adj_matrix = torch.from_numpy(adj_correlation(input_table,edge_percentile)).to_sparse_csr().to(dtype).to(device)
   features_adj_matrix = torch.from_numpy(adj_correlation(input_table.T,edge_percentile)).to_sparse_csr().to(dtype).to(device)
 
   data = torch.from_numpy(input_table).to(dtype).to(device)
-  gnn_model = TwoGNN(input_dimx, input_dimy, objects_embedding.shape[1], features_embedding.shape[1], hidden_dim, embedding_size, num_layers, learning_rate, exp_schedule, data, device)
+  gnn_model = TwoGNN(input_dimx, input_dimy, objects_embedding.shape[1], features_embedding.shape[1], hidden_dim, embedding_size, num_layers, learning_rate, exp_schedule, dropout,w_decay , data, device)
 
 
   print("training start") 

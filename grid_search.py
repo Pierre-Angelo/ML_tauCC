@@ -6,6 +6,7 @@ from sklearn.metrics import normalized_mutual_info_score as nmi
 from sklearn.metrics import adjusted_rand_score as ari
 import pandas as pd
 from tauccML_GNN import TwoGNN 
+from pickle import dump
 
 
 import itertools
@@ -22,7 +23,7 @@ print(f"Device : {dev}")
 
 device = torch.device(dev) 
 
-dataset= "cstr"
+dataset= "tr11"
 target_CSV = pd.read_csv(f'./datasets/{dataset}_target.txt', header = None)
 target = np.array(target_CSV).T[0]
 
@@ -71,16 +72,19 @@ class CustomGridSearch:
 
 # Define the search space for hyperparameters
 params  = {
-   'lr': [1e-3,1e-4],
-    'num_layers': [2,3,4],
-    'hidden_dim': [128,256,512,1024],
+   'lr': [1e-3],
+    'num_layers': [1,2,3],
+    'hidden_dim': [32,64,128],
     'link_percent' : [80,90,98],
-    'explained_var' : [0.5,0.8,0.9,1] 
+    'explained_var' : [0.5,0.8,1],
+    'dropout': [0,0.25,0.5],
+    'weight_decay': [0, 1e-4, 1e-2]
 }
 
 
 def scoring_function(**params):
-
+    set_seed()
+    num_runs = 5
     embedding_size = 10
     num_epochs = 100
     exp_schedule = 1
@@ -98,23 +102,25 @@ def scoring_function(**params):
     features_adj_matrix = torch.from_numpy(adj_correlation(input_table.T,params['link_percent'])).to_sparse_csr().to(dtype).to(device)
 
     data = torch.from_numpy(input_table).to(dtype).to(device)
-    gnn_model = TwoGNN(input_dimx, input_dimy, objects_embedding.shape[1], features_embedding.shape[1], params['hidden_dim'], embedding_size, params['num_layers'], params['lr'], exp_schedule, data, device)
+    scores = []
 
-    gnn_model.fit(objects_embedding, objects_adj_matrix, features_embedding, features_adj_matrix, num_epochs, threshold, patience, embedding_size,verbose=False)
+    for i in range(num_runs):
+        gnn_model = TwoGNN(input_dimx, input_dimy, objects_embedding.shape[1], features_embedding.shape[1], params['hidden_dim'], embedding_size, params['num_layers'], params['lr'], exp_schedule, params['dropout'], params['weight_decay'], data, device)
 
-    gnn_model.best_partion = torch.argmax(gnn_model.best_partion, dim=1)
+        gnn_model.fit(objects_embedding, objects_adj_matrix, features_embedding, features_adj_matrix, num_epochs, threshold, patience, embedding_size,verbose=False)
 
-    score = (nmi(target, gnn_model.best_partion.cpu()) + ari(target, gnn_model.best_partion.cpu())) * 0.5
+        gnn_model.best_partion = torch.argmax(gnn_model.best_partion, dim=1)
 
+        scores.append((nmi(target, gnn_model.best_partion.cpu()) + ari(target, gnn_model.best_partion.cpu())) * 0.5)
+
+    score = sum(scores)/num_runs
     return score
 
 
 if __name__ == '__main__':
     #cstr, tr23, tr11, tr45, tr41, classic3, hitech, k1b, reviews, sports
     
-    n_jobs = 10
-
-    set_seed()
+    n_jobs = 5
 
     grid_search = CustomGridSearch(params, scoring_function, n_jobs=n_jobs)
     grid_search.fit()
@@ -123,6 +129,11 @@ if __name__ == '__main__':
     results = grid_search.get_results()
     print("Best Parameters:", grid_search.best_params_)
     print("Best Score:", grid_search.best_score_)
-    #print("All Results:", results)
+
+    """ with open(f"./grid_search _results/{dataset}_search.pkl", 'wb') as f :
+        dump(results,f) """
+
 
 #{'lr': 0.0001, 'num_layers': 3, 'hidden_dim': 1024, 'link_percent': 98, 'explained_var': 0.5}
+#{'lr': 0.001, 'num_layers': 2, 'hidden_dim': 64, 'link_percent': 80, 'explained_var': 0.5, 'dropout': 0, 'weight_decay': 0}
+#{'lr': 0.001, 'num_layers': 2, 'hidden_dim': 64, 'link_percent': 98, 'explained_var': 1, 'dropout': 0, 'weight_decay': 0.0001}

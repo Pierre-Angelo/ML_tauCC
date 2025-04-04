@@ -9,27 +9,29 @@ torch.set_default_dtype(dtype)
 torch.autograd.set_detect_anomaly(True)
 
 class GNN(nn.Module):
-    def __init__(self, input_dim, hidden_dim, output_dim, num_layers):
+    def __init__(self, input_dim, hidden_dim, output_dim, num_layers, dropout):
         super(GNN, self).__init__()
         self.num_layers = num_layers
         self.conv_layers = nn.ModuleList([GCNConv(input_dim,hidden_dim)])
         for _ in range(num_layers - 1):
             self.conv_layers.append(GCNConv(hidden_dim, hidden_dim))
         self.fc = nn.Linear(hidden_dim, output_dim)
+        self.dropout = dropout
 
     def forward(self, x, adj):
         for i in range(self.num_layers):
             x = self.conv_layers[i](x,adj)
             x = F.elu(x)
+            x = F.dropout(x, p=self.dropout, training=self.training) * (1 - self.training*self.dropout)
         output = self.fc(x)
         output =  F.softmax(output, dim=1)
         return output
 
 class TwoGNN(nn.Module):
-    def __init__(self, input_dimx, input_dimy, num_compx, num_compy, hidden_dim, output_dim, num_layers, lr, exp, data, device):
+    def __init__(self, input_dimx, input_dimy, num_compx, num_compy, hidden_dim, output_dim, num_layers, lr, exp, dropout, w_decay, data, device):
         super(TwoGNN, self).__init__()
-        self.gnnx = GNN(num_compx, hidden_dim, output_dim, num_layers).to(device)
-        self.gnny = GNN(num_compy, hidden_dim, output_dim, num_layers).to(device)
+        self.gnnx = GNN(num_compx, hidden_dim, output_dim, num_layers,dropout).to(device)
+        self.gnny = GNN(num_compy, hidden_dim, output_dim, num_layers, dropout).to(device)
         self.dev = device
         # Partitions (one-hot encoded) and data
         self.data = data.to(dtype).T
@@ -42,8 +44,8 @@ class TwoGNN(nn.Module):
         for i in range(input_dimy):
             j = torch.randint(0, output_dim, (1,))
             self.col_labels_[i,j] = 1
-        self.optimizer = optim.Adam(self.parameters(), lr)
-        self.scheduler = torch.optim.lr_scheduler.ExponentialLR(self.optimizer,exp)
+        self.optimizer = optim.Adam(self.parameters(), lr,weight_decay=w_decay)
+        self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer)
 
     def loss(self, Px, Py, tauyx = False):
         # self.data (m,n), Px (n,k), Py(m,k)
@@ -77,12 +79,8 @@ class TwoGNN(nn.Module):
         epoch = 0
         last_improvement = 0
         
-        while (loss - min_loss) <= threshold and epoch < max_epochs and (epoch - last_improvement) < patience:
-            if loss < min_loss :
-                min_loss = loss 
-                last_improvement = epoch
-                self.best_partion = self.row_labels_.detach().clone()
-             
+        #while (loss - min_loss) <= threshold and epoch < max_epochs and (epoch - last_improvement) < patience:
+        while epoch < max_epochs :
             # Forward pass
             outputx = self.gnnx(objects_embedding, objects_adj_matrix) # (n,k)
             self.row_labels_ = torch.argmax(outputx, dim=1)
@@ -109,7 +107,32 @@ class TwoGNN(nn.Module):
 
             #if epoch < 20 : self.scheduler.step()
 
-            if verbose : print('%d, loss: %.3f' %(epoch + 1, -loss))
+            self.eval()
+
+            with torch.inference_mode():
+                outputx = self.gnnx(objects_embedding, objects_adj_matrix) # (n,k)
+                self.row_labels_ = torch.argmax(outputx, dim=1)
+                self.row_labels_ = F.one_hot(self.row_labels_, embedding_size).to(dtype)
+                # compute tau
+                loss1 = self.loss(outputx, self.col_labels_.to(self.dev), False)
+                
+                # Other side
+                outputy = self.gnny(features_embedding, features_adj_matrix)
+                self.col_labels_ = torch.argmax(outputy, dim=1)
+                self.col_labels_ = F.one_hot(self.col_labels_, embedding_size).to(dtype)
+                # compute tau
+                loss2 = self.loss(self.row_labels_.to(self.dev), outputy, True)
+                                    
+                # Joint loss
+                loss = loss1 + loss2    
+
+                if verbose : print('%d, loss: %.3f' %(epoch + 1, -loss))
+
+                if loss < min_loss :
+                    min_loss = loss 
+                    last_improvement = epoch
+                    self.best_partion = self.row_labels_.detach().clone()
+             
 
             epoch += 1
 
