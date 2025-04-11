@@ -31,13 +31,17 @@ def format_table(nmi,ari,time):
   for i in range(len(nmi)) :
     print(f"{nmi[i][0]} & {nmi[i][1]:.2f} $\pm$ {nmi[i][2]:.2f} & {ari[i][1]:.2f} $\pm$ {ari[i][2]:.2f} & {time[i][1]:.2f} $\pm$ {time[i][2]:.2f} \\\\ \n \hline")
   print()
+def write_table(nmi,ari,time):
+  with open("./res_bencmarck.txt",'w') as f :
+    for i in range(len(nmi)) :
+      f.write(f"{nmi[i][0]} & {nmi[i][1]:.2f} $\pm$ {nmi[i][2]:.2f} & {ari[i][1]:.2f} $\pm$ {ari[i][2]:.2f} & {time[i][1]:.2f} $\pm$ {time[i][2]:.2f} \\\\ \n \hline \n")
 
 ltime = []
 lnmi = []
 lari = []
 
-# ["cstr", "tr23", "tr11", "tr45", "tr41", "classic3", "hitech", "k1b", "reviews", "sports"]
-datasets = ["cstr", "tr23", "tr11", "tr45", "tr41", "classic3", "hitech", "k1b", "reviews", "sports"]
+# ["cstr", "tr23", "tr11", "tr45","acm", "tr41", "pubmed", "wiki", "classic3", "hitech", "k1b", "reviews", "sports", "ohscal", "ng20"]
+datasets = ["tr23"]
 for dataset in datasets:
   target_CSV = pd.read_csv(f'./datasets/{dataset}_target.txt', header = None)
   target = np.array(target_CSV).T[0]
@@ -47,19 +51,20 @@ for dataset in datasets:
   input_dimx, input_dimy = input_table.shape
 
   # Parameters
-  hidden_dim = 64
+  hidden_dim = 32
   explained_variance = 0.5
   embedding_size = 10
   num_epochs = 100
-  num_layers = 2
+  num_layers = 1
   learning_rate = 1e-3
   exp_schedule = 1
   threshold = 0.2
   patience = 20
-  edge_percentile = 80 
+  edge_percentile = 90
   dropout = 0
-  w_decay = 0
+  w_decay = 0.0001
   dtype = torch.float32
+ 
  
 
 
@@ -80,7 +85,7 @@ for dataset in datasets:
   durations = []
   NMI_table = []
   ARI_table = []
-  set_seed()
+  set_seed(1)
 
   for i in range(5):
     gnn_model = TwoGNN(input_dimx, input_dimy, objects_embedding.shape[1], features_embedding.shape[1], hidden_dim, embedding_size, num_layers, learning_rate, exp_schedule, dropout,w_decay , data, device)
@@ -100,6 +105,7 @@ for dataset in datasets:
   ltime.append((dataset,mean(durations),stdev(durations)))
   lnmi.append((dataset,mean(NMI_table),stdev(NMI_table)))
   lari.append((dataset,mean(ARI_table),stdev(ARI_table)))
+  write_table(lnmi,lari,ltime)
 
 print("time")
 format_plot(ltime)

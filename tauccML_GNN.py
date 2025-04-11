@@ -109,7 +109,7 @@ class TwoGNN(nn.Module):
 
             self.eval()
 
-            with torch.inference_mode():
+            with torch.no_grad():
                 outputx = self.gnnx(objects_embedding, objects_adj_matrix) # (n,k)
                 self.row_labels_ = torch.argmax(outputx, dim=1)
                 self.row_labels_ = F.one_hot(self.row_labels_, embedding_size).to(dtype)

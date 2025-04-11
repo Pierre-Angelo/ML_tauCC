@@ -14,6 +14,7 @@ figures
 metalearning.py
 grid_search _results
 test_decom.py
+res_bencmarck.txt
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

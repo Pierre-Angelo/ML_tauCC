@@ -56,8 +56,8 @@ if __name__ == "__main__":
 
   input_dimx, input_dimy = input_table.shape
   # Parameters
-  hidden_dim = 64
-  explained_variance = 1
+  hidden_dim = 128
+  explained_variance = 0.5
   embedding_size = 10
   num_epochs = 100
   num_layers = 2
@@ -65,12 +65,12 @@ if __name__ == "__main__":
   exp_schedule = 1
   threshold = 0.2
   patience = 20
-  edge_percentile = 98 
+  edge_percentile = 80
   dropout = 0
-  w_decay = 1e-2
+  w_decay = 0
   dtype = torch.float32
  
-  set_seed()
+  set_seed(0)
 
   #Generate feature vector and adjacency matrix (directly conveted into edge index)
 

@@ -134,6 +134,8 @@ if __name__ == '__main__':
         dump(results,f) """
 
 
-#{'lr': 0.0001, 'num_layers': 3, 'hidden_dim': 1024, 'link_percent': 98, 'explained_var': 0.5}
-#{'lr': 0.001, 'num_layers': 2, 'hidden_dim': 64, 'link_percent': 80, 'explained_var': 0.5, 'dropout': 0, 'weight_decay': 0}
-#{'lr': 0.001, 'num_layers': 2, 'hidden_dim': 64, 'link_percent': 98, 'explained_var': 1, 'dropout': 0, 'weight_decay': 0.0001}
+# tr11 {'lr': 0.001, 'num_layers': 2, 'hidden_dim': 128, 'link_percent': 80, 'explained_var': 0.5, 'dropout': 0, 'weight_decay': 0}
+#cstr {'lr': 0.001, 'num_layers': 2, 'hidden_dim': 64, 'link_percent': 90, 'explained_var': 0.5, 'dropout': 0, 'weight_decay': 0.0001}
+#tr23 {'lr': 0.001, 'num_layers': 1, 'hidden_dim': 32, 'link_percent': 90, 'explained_var': 1, 'dropout': 0, 'weight_decay': 0}
+# k1b {'lr': 0.001, 'num_layers': 2, 'hidden_dim': 128, 'link_percent': 80, 'explained_var': 0.5, 'dropout': 0, 'weight_decay': 0.0001}
+# hitech {'lr': 0.001, 'num_layers': 1, 'hidden_dim': 128, 'link_percent': 80, 'explained_var': 0.5, 'dropout': 0.25, 'weight_decay': 0}
